@@ -18,6 +18,7 @@ typedef struct
     char timezone[60];
     char ntp_server[128];
     int adc_offset;
+    int tx_limit_ms;
 } app_config_t;
 
 /*
@@ -29,6 +30,7 @@ ws_server wss://example.net:1234/test
 timezone CST-8
 ntp_server ntp.ntsc.ac.cn
 adc_offset -2300
+tx_limit_ms 120000
 */
 
 extern app_config_t app_config;

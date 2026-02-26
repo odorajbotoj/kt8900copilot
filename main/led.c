@@ -16,6 +16,19 @@ static const blink_step_t blink_green[] = {
     {LED_BLINK_HOLD, LED_STATE_ON, 100},
     {LED_BLINK_LOOP, 0, 0},
 };
+static const blink_step_t blink_white[] = {
+    {LED_BLINK_RGB, SET_RGB(255, 255, 255), 0},
+    {LED_BLINK_BRIGHTNESS, LED_STATE_25_PERCENT, 0},
+    {LED_BLINK_HOLD, LED_STATE_ON, 100},
+    {LED_BLINK_LOOP, 0, 0},
+};
+static const blink_step_t blink_disconn[] = {
+    {LED_BLINK_RGB, SET_RGB(255, 0, 0), 0},
+    {LED_BLINK_BRIGHTNESS, LED_STATE_25_PERCENT, 0},
+    {LED_BLINK_HOLD, LED_STATE_ON, 200},
+    {LED_BLINK_HOLD, LED_STATE_OFF, 300},
+    {LED_BLINK_LOOP, 0, 0},
+};
 static const blink_step_t blink_error[] = {
     {LED_BLINK_RGB, SET_RGB(255, 0, 0), 0},
     {LED_BLINK_BRIGHTNESS, LED_STATE_25_PERCENT, 0},
@@ -41,6 +54,8 @@ static const blink_step_t blink_off[] = {
 blink_step_t const *led_indicator_blink_lists[] = {
     [BLINK_RED] = blink_red,
     [BLINK_GREEN] = blink_green,
+    [BLINK_WHITE] = blink_white,
+    [BLINK_DISCONN] = blink_disconn,
     [BLINK_ERROR] = blink_error,
     [BLINK_YELLOW_3] = blink_yellow_3,
     [BLINK_OFF] = blink_off,

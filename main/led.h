@@ -9,6 +9,8 @@ enum
 {
     BLINK_RED = 0,
     BLINK_GREEN,
+    BLINK_WHITE,
+    BLINK_DISCONN,
     BLINK_ERROR,
     BLINK_YELLOW_3,
     BLINK_OFF,

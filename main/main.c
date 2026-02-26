@@ -4,13 +4,14 @@
 
 #include "config.h"
 
-#include "audio_adc.h"
-#include "audio_pwm.h"
-#include "gpio.h"
 #include "led.h"
+#include "gpio.h"
 #include "sdcard.h"
+#include "camera.h"
 #include "wifi.h"
 #include "ntp.h"
+#include "audio_adc.h"
+#include "audio_pwm.h"
 #include "ws.h"
 
 #define TAG "MAIN"
@@ -43,6 +44,9 @@ void app_main(void)
     // fread(cert_pem, sizeof(cert_pem[0]), sizeof(cert_pem) / sizeof(cert_pem[0]), certptr);
     // fclose(certptr);
     // ESP_LOGI(TAG, "read cert.pem:\nlength: %zu", strlen(cert_pem));
+
+    // camera
+    ESP_GOTO_ON_ERROR(camera_init(), err, TAG, "camera_init failed.");
 
     // wifi
     ESP_GOTO_ON_ERROR(nvs_init(), err, TAG, "nvs_init failed.");

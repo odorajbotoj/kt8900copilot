@@ -11,7 +11,9 @@
 #include "audio_adc.h"
 #include "audio_pwm.h"
 
-#define WS_BUF_SIZE 1024
+#include "esp_camera.h"
+
+#define WS_BUF_SIZE 8192
 
 extern esp_websocket_client_handle_t ws_client;
 

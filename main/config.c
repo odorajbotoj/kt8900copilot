@@ -47,7 +47,7 @@ esp_err_t load_config(void)
         fclose(mac_file);
         FILE *conf_file = NULL;
         ESP_RETURN_ON_FALSE(conf_file = fopen(MOUNT_POINT "/conf.txt", "w"), ESP_FAIL, TAG, "cannot write config to file.");
-        fputs("wifi_ssid\nwifi_password\nws_server\ntimezone CST-8\nntp_server ntp.ntsc.ac.cn\nadc_offset -2300", conf_file);
+        fputs("wifi_ssid\nwifi_password\nws_server\ntimezone CST-8\nntp_server ntp.ntsc.ac.cn\nadc_offset -2300\ntx_limit_ms 120000", conf_file);
         fclose(conf_file);
         ESP_LOGW(TAG, "config file generated.");
         return ESP_FAIL;
@@ -103,6 +103,10 @@ esp_err_t load_config(void)
         {
             app_config.adc_offset = atoi(valbuf);
         }
+        else if (0 == strcmp("tx_limit_ms", keybuf))
+        {
+            app_config.tx_limit_ms = atoi(valbuf);
+        }
         // clear
         memset(readbuf, 0, sizeof(readbuf));
         memset(keybuf, 0, sizeof(keybuf));
@@ -116,11 +120,13 @@ esp_err_t load_config(void)
 void print_config(void)
 {
     ESP_LOGI(TAG,
-             "read config:\nwifi ssid: %s\nwifi password length: %zu\nws server: %s\ntimezone: %s\nntp server: %s\nadc offset: %d",
+             "read config:\nwifi ssid: %s\nwifi password length: %zu\nws server: %s\n"
+             "timezone: %s\nntp server: %s\nadc offset: %d\ntx limit ms: %d",
              app_config.wifi_ssid,
              strlen(app_config.wifi_password),
              app_config.ws_server,
              app_config.timezone,
              app_config.ntp_server,
-             app_config.adc_offset);
+             app_config.adc_offset,
+             app_config.tx_limit_ms);
 }
