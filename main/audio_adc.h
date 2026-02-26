@@ -1,6 +1,6 @@
 #pragma once
 
-#include "macros.h"
+#include "esp_check.h"
 
 #include "esp_adc/adc_continuous.h"
 

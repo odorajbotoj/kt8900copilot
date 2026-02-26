@@ -14,9 +14,9 @@ esp_err_t pwm_init(void)
         .ringbuf_len = PWM_BUF_SIZE,
     };
 
-    ERR_CHK(pwm_audio_init(&pwm_conf), "Failed to init pwm audio.");
-    ERR_CHK(pwm_audio_set_param(32000, 16, 1), "Failed to set pwm audio.");
-    ERR_CHK(pwm_audio_start(), "Failed to start pwm audio.");
+    ESP_RETURN_ON_ERROR(pwm_audio_init(&pwm_conf), TAG, "Failed to init pwm audio.");
+    ESP_RETURN_ON_ERROR(pwm_audio_set_param(32000, 16, 1), TAG, "Failed to set pwm audio.");
+    ESP_RETURN_ON_ERROR(pwm_audio_start(), TAG, "Failed to start pwm audio.");
 
     return ESP_OK;
 }

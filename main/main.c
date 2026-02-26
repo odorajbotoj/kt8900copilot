@@ -1,4 +1,4 @@
-#include "macros.h"
+#include "esp_check.h"
 
 #include "utils.h"
 
@@ -10,56 +10,58 @@
 #include "led.h"
 #include "sdcard.h"
 #include "wifi.h"
+#include "ntp.h"
 #include "ws.h"
 
 #define TAG "MAIN"
 
-static char ws_key[128];
-static char cert_pem[4096];
+static char cert_pem[4096] = {0};
 
 void app_main(void)
 {
+    esp_err_t ret = ESP_OK;
+
+    // welcome
+    get_mac();
+    ESP_LOGI(TAG, "kt8900copilot - BG4QBF\n****************\ndevice MAC address: %s\n****************", device_mac_address);
     // led
     ESP_ERROR_CHECK(led_init());
     led_indicator_start(led_handle, BLINK_OFF);
     led_indicator_start(led_handle, BLINK_YELLOW_3);
 
     // gpio
-    ESP_ERROR_CHECK(gpio_init());
+    ESP_GOTO_ON_ERROR(gpio_init(), err, TAG, "gpio_init failed.");
 
     // sdcard
-    ESP_ERROR_CHECK(sdcard_init());
+    ESP_GOTO_ON_ERROR(sdcard_init(), err, TAG, "sdcard_init failed.");
     // read config
-    ESP_ERROR_CHECK(load_config());
-    ESP_LOGI(TAG, "read config:\nwifi ssid: %s\nwifi password length: %zu\nserver address: %s\nws key length: %zu", app_config.wifi_ssid, strlen(app_config.wifi_password), app_config.server_addr, strlen(ws_key));
+    ESP_GOTO_ON_ERROR(load_config(), err, TAG, "load_config failed.");
+    print_config();
     // load cert.pem
-    FILE *certptr = NULL;
-    certptr = fopen(MOUNT_POINT "/cert.pem", "r");
-    if (certptr == NULL)
-    {
-        ESP_LOGE(TAG, "cannot read cert.pem");
-        return;
-    }
-    fread(cert_pem, sizeof(cert_pem[0]), sizeof(cert_pem) / sizeof(cert_pem[0]), certptr);
-    fclose(certptr);
-    ESP_LOGI(TAG, "read cert.pem:\nlength: %zu", strlen(cert_pem));
+    // FILE *certptr = NULL;
+    // ESP_GOTO_ON_FALSE(certptr = fopen(MOUNT_POINT "/cert.pem", "r"), ESP_FAIL, err, TAG, "cannot read cert.pem");
+    // fread(cert_pem, sizeof(cert_pem[0]), sizeof(cert_pem) / sizeof(cert_pem[0]), certptr);
+    // fclose(certptr);
+    // ESP_LOGI(TAG, "read cert.pem:\nlength: %zu", strlen(cert_pem));
 
     // wifi
-    ESP_ERROR_CHECK(nvs_init());
-    ESP_ERROR_CHECK(wifi_init());
+    ESP_GOTO_ON_ERROR(nvs_init(), err, TAG, "nvs_init failed.");
+    ESP_GOTO_ON_ERROR(wifi_init(), err, TAG, "wifi_init failed.");
+    ntp_init();
 
     // adc
-    ESP_ERROR_CHECK(adc_init());
+    ESP_GOTO_ON_ERROR(adc_init(), err, TAG, "adc_init failed.");
     // pwm
-    ESP_ERROR_CHECK(pwm_init());
+    ESP_GOTO_ON_ERROR(pwm_init(), err, TAG, "pwm_init failed.");
 
     // websocket
-    ESP_ERROR_CHECK(websocket_init(cert_pem));
+    ESP_GOTO_ON_ERROR(websocket_init(cert_pem), err, TAG, "websocket_init failed.");
 
-    // xTaskCreatePinnedToCore(ptt_ctrl_test, "ptt_ctrl_test", 1024, NULL, 0, NULL, 1);
-    // xTaskCreatePinnedToCoreWithCaps(adc_audio_record_test, "adc_audio_test", 1024 * 1024, NULL, 0, NULL, 1, MALLOC_CAP_SPIRAM);
-    // xTaskCreatePinnedToCore(pwm_audio_test, "pwm_audio_test", 4096, NULL, 0, NULL, 0);
     xTaskCreatePinnedToCoreWithCaps(ws_adc_tx_task, "ws_adc_tx_task", 4 * 1024 * 1024, NULL, 0, NULL, 1, MALLOC_CAP_SPIRAM);
 
     led_indicator_stop(led_handle, BLINK_YELLOW_3);
+    return;
+err:
+    led_indicator_start(led_handle, BLINK_ERROR);
+    ESP_LOGE(TAG, "init error (%s), main function exiting ...", esp_err_to_name(ret));
 }

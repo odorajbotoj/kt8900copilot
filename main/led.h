@@ -1,6 +1,6 @@
 #pragma once
 
-#include "macros.h"
+#include "esp_check.h"
 
 #include "led_indicator.h"
 #include "led_indicator_strips.h"
@@ -9,6 +9,7 @@ enum
 {
     BLINK_RED = 0,
     BLINK_GREEN,
+    BLINK_ERROR,
     BLINK_YELLOW_3,
     BLINK_OFF,
     BLINK_MAX,

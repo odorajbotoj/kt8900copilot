@@ -38,7 +38,7 @@ static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
 esp_err_t websocket_init(const char *cert_pem)
 {
     esp_websocket_client_config_t ws_cfg = {
-        .uri = app_config.server_addr,
+        .uri = app_config.ws_server,
         // .cert_pem = cert_pem,
         .buffer_size = 4 * WS_BUF_SIZE,
         .reconnect_timeout_ms = 10000,
@@ -47,8 +47,9 @@ esp_err_t websocket_init(const char *cert_pem)
         .disable_auto_reconnect = false,
     };
     ws_client = esp_websocket_client_init(&ws_cfg);
-    ERR_CHK(esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DATA, ws_data_cb, NULL),
-            "Failed to register WebSocket event callback.");
+    ESP_RETURN_ON_ERROR(esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DATA, ws_data_cb, NULL),
+                        TAG,
+                        "Failed to register WebSocket event callback.");
     return ESP_OK;
 }
 

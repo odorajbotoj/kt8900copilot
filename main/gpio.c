@@ -18,8 +18,8 @@ esp_err_t gpio_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .pull_up_en = GPIO_PULLUP_ENABLE,
     };
-    ERR_CHK(gpio_config(&cfg_ptt), "Failed to set PTT gpio.");
+    ESP_RETURN_ON_ERROR(gpio_config(&cfg_ptt), TAG, "Failed to set PTT gpio.");
     gpio_set_level(GPIO_PTT, RIG_PTT_OFF);
-    ERR_CHK(gpio_config(&cfg_ctrl), "Failed to set CTRL gpio.");
+    ESP_RETURN_ON_ERROR(gpio_config(&cfg_ctrl), TAG, "Failed to set CTRL gpio.");
     return ESP_OK;
 }

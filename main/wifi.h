@@ -1,6 +1,6 @@
 #pragma once
 
-#include "macros.h"
+#include "esp_check.h"
 
 #include "config.h"
 
@@ -14,4 +14,4 @@
 #define WIFI_MAX_RETRY 3
 
 esp_err_t nvs_init(void);
-esp_err_t wifi_init();
+esp_err_t wifi_init(void);

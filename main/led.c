@@ -16,6 +16,13 @@ static const blink_step_t blink_green[] = {
     {LED_BLINK_HOLD, LED_STATE_ON, 100},
     {LED_BLINK_LOOP, 0, 0},
 };
+static const blink_step_t blink_error[] = {
+    {LED_BLINK_RGB, SET_RGB(255, 0, 0), 0},
+    {LED_BLINK_BRIGHTNESS, LED_STATE_25_PERCENT, 0},
+    {LED_BLINK_HOLD, LED_STATE_ON, 200},
+    {LED_BLINK_HOLD, LED_STATE_OFF, 800},
+    {LED_BLINK_LOOP, 0, 0},
+};
 static const blink_step_t blink_yellow_3[] = {
     {LED_BLINK_RGB, SET_RGB(255, 255, 0), 0},
     {LED_BLINK_BRIGHTNESS, LED_STATE_25_PERCENT, 0},
@@ -34,6 +41,7 @@ static const blink_step_t blink_off[] = {
 blink_step_t const *led_indicator_blink_lists[] = {
     [BLINK_RED] = blink_red,
     [BLINK_GREEN] = blink_green,
+    [BLINK_ERROR] = blink_error,
     [BLINK_YELLOW_3] = blink_yellow_3,
     [BLINK_OFF] = blink_off,
     [BLINK_MAX] = NULL,
@@ -60,6 +68,6 @@ esp_err_t led_init(void)
         .blink_lists = led_indicator_blink_lists,
         .blink_list_num = BLINK_MAX,
     };
-    ERR_CHK(led_indicator_new_strips_device(&config, &led_cfg, &led_handle), "Failed to new led indicator device.");
+    ESP_RETURN_ON_ERROR(led_indicator_new_strips_device(&config, &led_cfg, &led_handle), TAG, "Failed to new led indicator device.");
     return ESP_OK;
 }

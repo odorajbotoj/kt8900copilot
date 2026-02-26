@@ -16,6 +16,6 @@ esp_err_t sdcard_init(void)
         .format_if_mount_failed = false,
         .max_files = 4,
     };
-    ERR_CHK(esp_vfs_fat_sdmmc_mount(MOUNT_POINT, &host, &slot_conf, &mount_conf, &card), "Failed to mount filesystem.");
+    ESP_RETURN_ON_ERROR(esp_vfs_fat_sdmmc_mount(MOUNT_POINT, &host, &slot_conf, &mount_conf, &card), TAG, "Failed to mount filesystem.");
     return ESP_OK;
 }

@@ -13,7 +13,7 @@ esp_err_t adc_init(void)
             .flush_pool = true,
         },
     };
-    ERR_CHK(adc_continuous_new_handle(&adc_handle_cfg, &adc_handle), "Failed to new ADC handle.");
+    ESP_RETURN_ON_ERROR(adc_continuous_new_handle(&adc_handle_cfg, &adc_handle), TAG, "Failed to new ADC handle.");
 
     adc_digi_pattern_config_t pattern_cfg[1] = {
         {
@@ -30,9 +30,9 @@ esp_err_t adc_init(void)
         .conv_mode = ADC_CONV_SINGLE_UNIT_1,
         .format = ADC_DIGI_OUTPUT_FORMAT_TYPE2,
     };
-    ERR_CHK(adc_continuous_config(adc_handle, &adc_cfg), "Failed to set ADC config.");
+    ESP_RETURN_ON_ERROR(adc_continuous_config(adc_handle, &adc_cfg), TAG, "Failed to set ADC config.");
 
-    ERR_CHK(adc_continuous_start(adc_handle), "Failed to start ADC.");
+    ESP_RETURN_ON_ERROR(adc_continuous_start(adc_handle), TAG, "Failed to start ADC.");
 
     return ESP_OK;
 }
