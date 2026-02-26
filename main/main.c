@@ -12,8 +12,6 @@
 #include "wifi.h"
 #include "ws.h"
 
-#include "tests.h"
-
 #define TAG "MAIN"
 
 static char ws_key[128];
