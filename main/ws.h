@@ -2,6 +2,8 @@
 
 #include "macros.h"
 
+#include "config.h"
+
 #include "esp_websocket_client.h"
 
 #include "led.h"
@@ -13,5 +15,5 @@
 
 extern esp_websocket_client_handle_t ws_client;
 
-esp_err_t websocket_init(const char *uri, const char *cert_pem);
+esp_err_t websocket_init(const char *cert_pem);
 void ws_adc_tx_task(void *arg);

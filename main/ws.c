@@ -29,16 +29,16 @@ static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
         if (g_is_rig_tx)
         {
             size_t written_bytes = 0;
-            pwm_audio_write(data->data_ptr, data->data_len, &written_bytes, 1000 / portTICK_PERIOD_MS);
+            pwm_audio_write((uint8_t *)data->data_ptr, data->data_len, &written_bytes, 1000 / portTICK_PERIOD_MS);
         }
         break;
     }
 }
 
-esp_err_t websocket_init(const char *uri, const char *cert_pem)
+esp_err_t websocket_init(const char *cert_pem)
 {
     esp_websocket_client_config_t ws_cfg = {
-        .uri = uri,
+        .uri = app_config.server_addr,
         // .cert_pem = cert_pem,
         .buffer_size = 4 * WS_BUF_SIZE,
         .reconnect_timeout_ms = 10000,
@@ -87,16 +87,16 @@ void ws_adc_tx_task(void *arg)
             {
                 ctrl_off_delay = 16;
             }
-            read_samples = 0;                                                                                                                        // 重置读取计数
-            err = adc_continuous_read_parse(adc_handle, adc_read_buf, sizeof(adc_read_buf) / sizeof(adc_read_buf[0]), &read_samples, portMAX_DELAY); // 读取并解析
+            read_samples = 0;                                                                                                                        // reset count
+            err = adc_continuous_read_parse(adc_handle, adc_read_buf, sizeof(adc_read_buf) / sizeof(adc_read_buf[0]), &read_samples, portMAX_DELAY); // read and parse
             if (ESP_OK == err)
             {
-                memset(ws_send_buf, 0, sizeof(ws_send_buf)); // 重置待发缓冲区
+                memset(ws_send_buf, 0, sizeof(ws_send_buf)); // reset send buffer
                 for (uint32_t i = 0; i < read_samples; ++i)
                 {
                     if (adc_read_buf[i].valid)
                     {
-                        ws_send_buf[i] = ((int16_t)(adc_read_buf[i].raw_data) - 2300) << 4; // 处理样本, 2300 is the magic number
+                        ws_send_buf[i] = ((int16_t)(adc_read_buf[i].raw_data) + app_config.adc_offset) << 4; // process samples
                     }
                 }
                 if (g_is_rig_tx || !esp_websocket_client_is_connected(ws_client))

@@ -53,7 +53,7 @@ esp_err_t nvs_init(void)
     return ESP_OK;
 }
 
-esp_err_t wifi_init(const char *ssid, const char *password)
+esp_err_t wifi_init()
 {
     // init
     wifi_event_group = xEventGroupCreate();
@@ -78,8 +78,8 @@ esp_err_t wifi_init(const char *ssid, const char *password)
             "Failed to register WiFi event callback.");
     // set ssid and password
     wifi_config_t wifi_config = {0};
-    memcpy(wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
-    memcpy(wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
+    memcpy(wifi_config.sta.ssid, app_config.wifi_ssid, sizeof(wifi_config.sta.ssid));
+    memcpy(wifi_config.sta.password, app_config.wifi_password, sizeof(wifi_config.sta.password));
     ERR_CHK(esp_wifi_set_mode(WIFI_MODE_STA), "Failed to set WiFi mode.");
     ERR_CHK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config), "Failed to set WiFi config.");
     // start
@@ -93,7 +93,7 @@ esp_err_t wifi_init(const char *ssid, const char *password)
                                            portMAX_DELAY);
     if (bits & WIFI_CONNECTED_BIT)
     {
-        ESP_LOGI(TAG, "connected to ap SSID:%s", ssid);
+        ESP_LOGI(TAG, "connected to ap SSID:%s", app_config.wifi_ssid);
     }
     else if (bits & WIFI_FAIL_BIT)
     {

@@ -2,6 +2,8 @@
 
 #include "macros.h"
 
+#include "config.h"
+
 #include "led.h"
 
 #include "freertos/event_groups.h"
@@ -12,4 +14,4 @@
 #define WIFI_MAX_RETRY 3
 
 esp_err_t nvs_init(void);
-esp_err_t wifi_init(const char *ssid, const char *password);
+esp_err_t wifi_init();
