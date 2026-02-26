@@ -1,0 +1,17 @@
+#pragma once
+
+#include "macros.h"
+
+#include "esp_websocket_client.h"
+
+#include "led.h"
+#include "gpio.h"
+#include "audio_adc.h"
+#include "audio_pwm.h"
+
+#define WS_BUF_SIZE 1024
+
+extern esp_websocket_client_handle_t ws_client;
+
+esp_err_t websocket_init(const char *uri, const char *cert_pem);
+void ws_adc_tx_task(void *arg);
