@@ -36,8 +36,92 @@ void get_mac(void)
     }
 }
 
+esp_err_t write_config(void)
+{
+    FILE *conf_file = NULL;
+    ESP_RETURN_ON_FALSE(conf_file = fopen(MOUNT_POINT "/conf.txt", "w"), ESP_FAIL, TAG, "cannot write config to file.");
+    char conf_str[1024];
+    sprintf(conf_str,
+            "wifi_ssid %s\n"
+            "wifi_password %s\n"
+            "ws_server %s\n"
+            "timezone %s\n"
+            "ntp_server %s\n"
+            "adc_offset %d\n"
+            "tx_limit_ms %d",
+            app_config.wifi_ssid,
+            app_config.wifi_password,
+            app_config.ws_server,
+            app_config.timezone,
+            app_config.ntp_server,
+            app_config.adc_offset,
+            app_config.tx_limit_ms);
+    fputs(conf_str, conf_file);
+    fclose(conf_file);
+    return ESP_OK;
+}
+
+void parse_conf_line(const char *input)
+{
+    int split_index = 0;
+    char readbuf[128] = {0};
+    strncpy(readbuf, input, 128);
+    char keybuf[128] = {0};
+    char valbuf[128] = {0};
+    remove_right_space(readbuf);
+    // parse
+    for (int i = 0; i < 256; ++i)
+    {
+        if (readbuf[i] == '\0')
+        {
+            break;
+        }
+        else if (readbuf[i] == ' ')
+        {
+            readbuf[i] = '\0';
+            split_index = i;
+            break;
+        }
+    }
+    strncpy(keybuf, readbuf, 128);
+    strncpy(valbuf, readbuf + split_index + 1, 128);
+    // save
+    if (0 == strcmp("wifi_ssid", keybuf))
+    {
+        strncpy(app_config.wifi_ssid, valbuf, sizeof(app_config.wifi_ssid));
+    }
+    else if (0 == strcmp("wifi_password", keybuf))
+    {
+        strncpy(app_config.wifi_password, valbuf, sizeof(app_config.wifi_password));
+    }
+    else if (0 == strcmp("ws_server", keybuf))
+    {
+        strncpy(app_config.ws_server, valbuf, sizeof(app_config.ws_server));
+    }
+    else if (0 == strcmp("timezone", keybuf))
+    {
+        strncpy(app_config.timezone, valbuf, sizeof(app_config.timezone));
+    }
+    else if (0 == strcmp("ntp_server", keybuf))
+    {
+        strncpy(app_config.ntp_server, valbuf, sizeof(app_config.ntp_server));
+    }
+    else if (0 == strcmp("adc_offset", keybuf))
+    {
+        app_config.adc_offset = atoi(valbuf);
+    }
+    else if (0 == strcmp("tx_limit_ms", keybuf))
+    {
+        app_config.tx_limit_ms = atoi(valbuf);
+    }
+}
+
 esp_err_t load_config(void)
 {
+    strcpy(app_config.timezone, "CST-8");
+    strcpy(app_config.ntp_server, "ntp.ntsc.ac.cn");
+    app_config.adc_offset = -2300;
+    app_config.tx_limit_ms = 120000;
     // file not exist
     if (access(MOUNT_POINT "/conf.txt", F_OK) == -1)
     {
@@ -45,10 +129,7 @@ esp_err_t load_config(void)
         ESP_RETURN_ON_FALSE(mac_file = fopen(MOUNT_POINT "/mac.txt", "w"), ESP_FAIL, TAG, "cannot write MAC to file.");
         fputs(device_mac_address, mac_file);
         fclose(mac_file);
-        FILE *conf_file = NULL;
-        ESP_RETURN_ON_FALSE(conf_file = fopen(MOUNT_POINT "/conf.txt", "w"), ESP_FAIL, TAG, "cannot write config to file.");
-        fputs("wifi_ssid\nwifi_password\nws_server\ntimezone CST-8\nntp_server ntp.ntsc.ac.cn\nadc_offset -2300\ntx_limit_ms 120000", conf_file);
-        fclose(conf_file);
+        ESP_RETURN_ON_ERROR(write_config(), TAG, "write_config failed.");
         ESP_LOGW(TAG, "config file generated.");
         return ESP_FAIL;
     }
@@ -56,62 +137,10 @@ esp_err_t load_config(void)
     FILE *fptr = NULL;
     ESP_RETURN_ON_FALSE(fptr = fopen(MOUNT_POINT "/conf.txt", "r"), ESP_FAIL, TAG, "cannot read config file.");
     char readbuf[256] = {0};
-    char keybuf[128] = {0};
-    char valbuf[128] = {0};
-    int split_index = 0;
     while (NULL != fgets(readbuf, sizeof(readbuf), fptr))
     {
-        remove_right_space(readbuf);
-        // parse
-        for (int i = 0; i < 256; ++i)
-        {
-            if (readbuf[i] == '\0')
-            {
-                break;
-            }
-            else if (readbuf[i] == ' ')
-            {
-                readbuf[i] = '\0';
-                split_index = i;
-                break;
-            }
-        }
-        strncpy(keybuf, readbuf, 128);
-        strncpy(valbuf, readbuf + split_index + 1, 128);
-        // save
-        if (0 == strcmp("wifi_ssid", keybuf))
-        {
-            strncpy(app_config.wifi_ssid, valbuf, sizeof(app_config.wifi_ssid));
-        }
-        else if (0 == strcmp("wifi_password", keybuf))
-        {
-            strncpy(app_config.wifi_password, valbuf, sizeof(app_config.wifi_password));
-        }
-        else if (0 == strcmp("ws_server", keybuf))
-        {
-            strncpy(app_config.ws_server, valbuf, sizeof(app_config.ws_server));
-        }
-        else if (0 == strcmp("timezone", keybuf))
-        {
-            strncpy(app_config.timezone, valbuf, sizeof(app_config.timezone));
-        }
-        else if (0 == strcmp("ntp_server", keybuf))
-        {
-            strncpy(app_config.ntp_server, valbuf, sizeof(app_config.ntp_server));
-        }
-        else if (0 == strcmp("adc_offset", keybuf))
-        {
-            app_config.adc_offset = atoi(valbuf);
-        }
-        else if (0 == strcmp("tx_limit_ms", keybuf))
-        {
-            app_config.tx_limit_ms = atoi(valbuf);
-        }
-        // clear
+        parse_conf_line(readbuf);
         memset(readbuf, 0, sizeof(readbuf));
-        memset(keybuf, 0, sizeof(keybuf));
-        memset(valbuf, 0, sizeof(valbuf));
-        split_index = 0;
     }
     fclose(fptr);
     return ESP_OK;

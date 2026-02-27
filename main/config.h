@@ -37,5 +37,7 @@ extern app_config_t app_config;
 extern char device_mac_address[24];
 
 void get_mac(void);
+esp_err_t write_config(void);
+void parse_conf_line(const char *input);
 esp_err_t load_config(void);
 void print_config(void);
