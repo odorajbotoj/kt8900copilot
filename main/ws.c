@@ -4,15 +4,21 @@
 
 esp_websocket_client_handle_t ws_client;
 
-static volatile bool g_is_rig_tx = false;       // rig tx
-static volatile bool g_is_img_on = false;       // when taking photos
-static volatile bool g_is_setting_conf = false; // when setting config
-static TickType_t last_ptt_on;                  // used for calculating tx time limit
+static volatile bool g_is_rig_tx = false; // rig tx
+static volatile bool g_is_img_on = false; // when taking photos
 
-static const char CTRL_CODE[] = {0x00, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x31, 0x32, 0x33, 0x51, 0x61, 0x71};
+TaskHandle_t ws_adc_tx_task_handle;
+static EventGroupHandle_t ws_event_group;
+#define WS_EVT_REFUSE_BIT BIT0
+
+static TickType_t last_ptt_on; // used for calculating tx time limit
+
+static const char CTRL_CODE[] = {0x00, 0x01, 0x02, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x31, 0x32, 0x33, 0x51, 0x61};
 enum
 {
     SKIP = 0,
+    VERIFY,
+    REFUSE,
     RX,
     RX_STOP,
     TX,
@@ -21,14 +27,16 @@ enum
     IMG_UPLOAD_STOP,
     IMG_GET,
     SET_CONF,
+    RESET,
     S_E_IMG_NIL,
     S_S_SET_CONF,
     S_E_SET_CONF,
     PCM,
     IMG,
-    TXT,
 };
 #define CTRL_CODE_SKIP 0x00
+#define CTRL_CODE_VERIFY 0x01
+#define CTRL_CODE_REFUSE 0x02
 #define CTRL_CODE_RX 0x11
 #define CTRL_CODE_RX_STOP 0x12
 #define CTRL_CODE_TX 0x13
@@ -37,13 +45,14 @@ enum
 #define CTRL_CODE_IMG_UPLOAD_STOP 0x16
 #define CTRL_CODE_IMG_GET 0x17
 #define CTRL_CODE_SET_CONF 0x18
+#define CTRL_CODE_RESET 0x19
 #define CTRL_CODE_S_E_IMG_NIL 0x31
 #define CTRL_CODE_S_S_SET_CONF 0x32
 #define CTRL_CODE_S_E_SET_CONF 0x33
 #define CTRL_CODE_PCM 0x51
 #define CTRL_CODE_IMG 0x61
-#define CTRL_CODE_TXT 0x71
 
+// functions below are for data processing callback
 static inline void ptt_on(void)
 {
     g_is_rig_tx = true;
@@ -132,35 +141,33 @@ err:
 }
 static inline esp_err_t edit_conf(const char *d)
 {
-    if (g_is_setting_conf)
+    parse_conf_line(d);
+    esp_err_t e = write_config();
+    if (e != ESP_OK)
     {
-        parse_conf_line(d);
-        g_is_setting_conf = false;
-        esp_err_t e = write_config();
-        if (e != ESP_OK)
-        {
-            ESP_RETURN_ON_FALSE(esp_websocket_client_is_connected(ws_client) &&
-                                    (-1 != esp_websocket_client_send_bin(ws_client,
-                                                                         CTRL_CODE + S_E_SET_CONF,
-                                                                         1,
-                                                                         pdMS_TO_TICKS(50))),
-                                ESP_FAIL,
-                                TAG,
-                                "Failed to send set_conf error signal to server.");
-        }
         ESP_RETURN_ON_FALSE(esp_websocket_client_is_connected(ws_client) &&
                                 (-1 != esp_websocket_client_send_bin(ws_client,
-                                                                     CTRL_CODE + S_S_SET_CONF,
+                                                                     CTRL_CODE + S_E_SET_CONF,
                                                                      1,
                                                                      pdMS_TO_TICKS(50))),
                             ESP_FAIL,
                             TAG,
-                            "Failed to send set_conf success signal to server.");
+                            "Failed to send set_conf error signal to server.");
     }
+    ESP_RETURN_ON_FALSE(esp_websocket_client_is_connected(ws_client) &&
+                            (-1 != esp_websocket_client_send_bin(ws_client,
+                                                                 CTRL_CODE + S_S_SET_CONF,
+                                                                 1,
+                                                                 pdMS_TO_TICKS(50))),
+                        ESP_FAIL,
+                        TAG,
+                        "Failed to send set_conf success signal to server.");
     ESP_LOGI(TAG, "SET_CONF_DONE");
     return ESP_OK;
 }
+// functions above are for data processing callback
 
+// data processing callback
 static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)ev_data;
@@ -191,24 +198,53 @@ static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
             ESP_RETURN_VOID_ON_ERROR(get_and_upload_img(), TAG, "get_and_upload_img failed.");
             return;
         case CTRL_CODE_SET_CONF:
-            g_is_setting_conf = true;
-            return;
-        case CTRL_CODE_TXT:
             ESP_RETURN_VOID_ON_ERROR(edit_conf(data->data_ptr + 1), TAG, "edit_conf failed.");
+            return;
+        case CTRL_CODE_RESET:
+            esp_restart();
+            return;
+        case CTRL_CODE_VERIFY:
+            if (data->data_len != 17)
+                return;
+            memcpy(random_verify, data->data_ptr + 1, 16);
+            calculate_passkey();
+            esp_websocket_client_send_bin(ws_client, (const char *)app_passkey, 16, pdMS_TO_TICKS(10)); // send key for verifying
+            return;
+        case CTRL_CODE_REFUSE:
+            ESP_LOGE(TAG, "Server refused the connection.");
+            xEventGroupSetBits(ws_event_group, WS_EVT_REFUSE_BIT);
             return;
         }
     }
 }
 
+// functions below are websocket (dis)connect event callbacks
 static void ws_conn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
     led_indicator_stop(led_handle, BLINK_DISCONN);
+    esp_websocket_client_send_bin(ws_client, (const char *)device_mac_address, strlen(device_mac_address), pdMS_TO_TICKS(10));
 }
 static void ws_disconn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
     led_indicator_start(led_handle, BLINK_DISCONN);
 }
+// functions above are websocket (dis)connect event callbacks
 
+void ws_destroy_task(void *arg)
+{
+    EventBits_t bits = xEventGroupWaitBits(ws_event_group, WS_EVT_REFUSE_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+    if (bits & WS_EVT_REFUSE_BIT)
+    {
+        esp_websocket_client_stop(ws_client);
+        esp_websocket_client_destroy(ws_client);
+        ESP_LOGW(TAG, "connection refused, websocket client closed.");
+    }
+    if (ws_adc_tx_task_handle)
+        vTaskDelete(ws_adc_tx_task_handle);
+    vTaskDelete(NULL);
+}
+
+// 初始化ws客户端
 esp_err_t websocket_init(const char *cert_pem)
 {
     esp_websocket_client_config_t ws_cfg = {
@@ -231,9 +267,12 @@ esp_err_t websocket_init(const char *cert_pem)
     ESP_RETURN_ON_ERROR(esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DISCONNECTED, ws_disconn_cb, NULL),
                         TAG,
                         "Failed to register WebSocket disconn event callback.");
+    ws_event_group = xEventGroupCreate();
+    xTaskCreatePinnedToCore(ws_destroy_task, "ws_destroy_task", 2 * 1024, NULL, 0, NULL, 1);
     return ESP_OK;
 }
 
+// adc录音-ws传输 主任务
 void ws_adc_tx_task(void *arg)
 {
     // start client
@@ -251,11 +290,11 @@ void ws_adc_tx_task(void *arg)
     bool ctrl_level;
     uint8_t ctrl_off_delay = 0;
     ESP_LOGI(TAG, "ws_adc_tx_task runs into mainloop.");
-    while (1)
+    for (;;)
     {
         while (g_is_img_on || g_is_rig_tx || !esp_websocket_client_is_connected(ws_client) || gpio_get_level(GPIO_CTRL) == RIG_CTRL_OFF)
         {
-            vTaskDelay(pdMS_TO_TICKS(20)); // 自旋等待
+            vTaskDelay(pdMS_TO_TICKS(20)); // waiting
         }
         if (-1 == esp_websocket_client_send_bin(ws_client, CTRL_CODE + RX, 1, pdMS_TO_TICKS(50)))
         {

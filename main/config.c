@@ -4,6 +4,8 @@
 
 app_config_t app_config = {0};
 char device_mac_address[24] = {0};
+uint8_t random_verify[16] = {0};
+uint8_t app_passkey[16] = {0};
 
 void get_mac(void)
 {
@@ -45,6 +47,7 @@ esp_err_t write_config(void)
             "wifi_ssid %s\n"
             "wifi_password %s\n"
             "ws_server %s\n"
+            "ws_key %s\n"
             "timezone %s\n"
             "ntp_server %s\n"
             "adc_offset %d\n"
@@ -52,6 +55,7 @@ esp_err_t write_config(void)
             app_config.wifi_ssid,
             app_config.wifi_password,
             app_config.ws_server,
+            app_config.ws_key,
             app_config.timezone,
             app_config.ntp_server,
             app_config.adc_offset,
@@ -59,6 +63,21 @@ esp_err_t write_config(void)
     fputs(conf_str, conf_file);
     fclose(conf_file);
     return ESP_OK;
+}
+
+void calculate_passkey(void)
+{
+    size_t s1 = strlen(device_mac_address);
+    size_t s2 = strlen(app_config.ws_key);
+    size_t siz = s1 + s2 + 18;
+    uint8_t inbuf[siz];
+    memset(inbuf, 0, siz);
+    memcpy(inbuf, device_mac_address, s1);
+    memcpy(inbuf + s1, ":", 1);
+    memcpy(inbuf + s1 + 1, random_verify, 16);
+    memcpy(inbuf + s1 + 17, ":", 1);
+    memcpy(inbuf + s1 + 18, app_config.ws_key, s2);
+    mbedtls_md5(inbuf, siz, app_passkey);
 }
 
 void parse_conf_line(const char *input)
@@ -97,6 +116,10 @@ void parse_conf_line(const char *input)
     else if (0 == strcmp("ws_server", keybuf))
     {
         strncpy(app_config.ws_server, valbuf, sizeof(app_config.ws_server));
+    }
+    else if (0 == strcmp("ws_key", keybuf))
+    {
+        strncpy(app_config.ws_key, valbuf, sizeof(app_config.ws_key));
     }
     else if (0 == strcmp("timezone", keybuf))
     {
@@ -149,11 +172,14 @@ esp_err_t load_config(void)
 void print_config(void)
 {
     ESP_LOGI(TAG,
-             "read config:\nwifi ssid: %s\nwifi password length: %zu\nws server: %s\n"
+             "read config:\n"
+             "wifi ssid: %s\nwifi password length: %zu\n"
+             "ws server: %s\nws key length: %zu\n"
              "timezone: %s\nntp server: %s\nadc offset: %d\ntx limit ms: %d",
              app_config.wifi_ssid,
              strlen(app_config.wifi_password),
              app_config.ws_server,
+             strlen(app_config.ws_key),
              app_config.timezone,
              app_config.ntp_server,
              app_config.adc_offset,

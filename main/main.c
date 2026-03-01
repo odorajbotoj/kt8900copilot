@@ -61,11 +61,13 @@ void app_main(void)
     // websocket
     ESP_GOTO_ON_ERROR(websocket_init(cert_pem), err, TAG, "websocket_init failed.");
 
-    xTaskCreatePinnedToCoreWithCaps(ws_adc_tx_task, "ws_adc_tx_task", 4 * 1024 * 1024, NULL, 0, NULL, 1, MALLOC_CAP_SPIRAM);
+    xTaskCreatePinnedToCoreWithCaps(ws_adc_tx_task, "ws_adc_tx_task", 4 * 1024 * 1024, NULL, 0, &ws_adc_tx_task_handle, 1, MALLOC_CAP_SPIRAM);
 
     led_indicator_stop(led_handle, BLINK_YELLOW_3);
     return;
+
 err:
     led_indicator_start(led_handle, BLINK_ERROR);
     ESP_LOGE(TAG, "init error (%s), main function exiting ...", esp_err_to_name(ret));
+    return;
 }
