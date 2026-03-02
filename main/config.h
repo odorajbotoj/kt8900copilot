@@ -44,6 +44,6 @@ extern uint8_t app_passkey[16];
 void get_mac(void);
 esp_err_t write_config(void);
 void calculate_passkey(void);
-void parse_conf_line(const char *input);
+void parse_conf_line(const char *input, size_t len);
 esp_err_t load_config(void);
 void print_config(void);

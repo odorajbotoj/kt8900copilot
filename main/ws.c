@@ -145,9 +145,9 @@ err:
     g_is_img_on = false;
     return ret;
 }
-static inline esp_err_t edit_conf(const char *d)
+static inline esp_err_t edit_conf(const char *d, size_t len)
 {
-    parse_conf_line(d);
+    parse_conf_line(d, len);
     esp_err_t e = write_config();
     if (e != ESP_OK)
     {
@@ -204,7 +204,7 @@ static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
             ESP_RETURN_VOID_ON_ERROR(get_and_upload_img(), TAG, "get_and_upload_img failed.");
             return;
         case CTRL_CODE_SET_CONF:
-            ESP_RETURN_VOID_ON_ERROR(edit_conf(data->data_ptr + 1), TAG, "edit_conf failed.");
+            ESP_RETURN_VOID_ON_ERROR(edit_conf(data->data_ptr + 1, data->data_len - 1), TAG, "edit_conf failed.");
             return;
         case CTRL_CODE_RESET:
             esp_restart();

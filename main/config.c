@@ -80,11 +80,11 @@ void calculate_passkey(void)
     mbedtls_md5(inbuf, siz, app_passkey);
 }
 
-void parse_conf_line(const char *input)
+void parse_conf_line(const char *input, size_t len)
 {
     int split_index = 0;
     char readbuf[128] = {0};
-    strncpy(readbuf, input, 128);
+    strncpy(readbuf, input, len);
     char keybuf[128] = {0};
     char valbuf[128] = {0};
     remove_right_space(readbuf);
@@ -162,7 +162,7 @@ esp_err_t load_config(void)
     char readbuf[256] = {0};
     while (NULL != fgets(readbuf, sizeof(readbuf), fptr))
     {
-        parse_conf_line(readbuf);
+        parse_conf_line(readbuf, 128);
         memset(readbuf, 0, sizeof(readbuf));
     }
     fclose(fptr);
