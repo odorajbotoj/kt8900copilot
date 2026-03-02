@@ -12,11 +12,12 @@
 #include "audio_pwm.h"
 
 #include "esp_camera.h"
+#include "esp_crt_bundle.h"
 
 #define WS_BUF_SIZE 8192
 
 extern esp_websocket_client_handle_t ws_client;
 extern TaskHandle_t ws_adc_tx_task_handle;
 
-esp_err_t websocket_init(const char *cert_pem);
+esp_err_t websocket_init();
 void ws_adc_tx_task(void *arg);

@@ -13,7 +13,7 @@ static EventGroupHandle_t ws_event_group;
 
 static TickType_t last_ptt_on; // used for calculating tx time limit
 
-static const char CTRL_CODE[] = {0x00, 0x01, 0x02, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x31, 0x32, 0x33, 0x51, 0x61};
+static const char CTRL_CODE[] = {0x00, 0x01, 0x02, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x31, 0x32, 0x33, 0x51, 0x61};
 enum
 {
     SKIP = 0,
@@ -25,9 +25,12 @@ enum
     TX_STOP,
     IMG_UPLOAD,
     IMG_UPLOAD_STOP,
+    IMG_DOWNLOAD,
+    IMG_DOWNLOAD_STOP,
     IMG_GET,
     SET_CONF,
     RESET,
+    FROM,
     S_E_IMG_NIL,
     S_S_SET_CONF,
     S_E_SET_CONF,
@@ -43,9 +46,12 @@ enum
 #define CTRL_CODE_TX_STOP 0x14
 #define CTRL_CODE_IMG_UPLOAD 0x15
 #define CTRL_CODE_IMG_UPLOAD_STOP 0x16
-#define CTRL_CODE_IMG_GET 0x17
-#define CTRL_CODE_SET_CONF 0x18
-#define CTRL_CODE_RESET 0x19
+#define CTRL_CODE_IMG_DOWNLOAD 0x17
+#define CTRL_CODE_IMG_DOWNLOAD_STOP 0x18
+#define CTRL_CODE_IMG_GET 0x19
+#define CTRL_CODE_SET_CONF 0x1A
+#define CTRL_CODE_RESET 0x1B
+#define CTRL_CODE_FROM 0x1C
 #define CTRL_CODE_S_E_IMG_NIL 0x31
 #define CTRL_CODE_S_S_SET_CONF 0x32
 #define CTRL_CODE_S_E_SET_CONF 0x33
@@ -245,17 +251,17 @@ void ws_destroy_task(void *arg)
 }
 
 // 初始化ws客户端
-esp_err_t websocket_init(const char *cert_pem)
+esp_err_t websocket_init()
 {
     esp_websocket_client_config_t ws_cfg = {
         .uri = app_config.ws_server,
-        // .cert_pem = cert_pem,
         .buffer_size = WS_BUF_SIZE,
         .reconnect_timeout_ms = 10000,
         .network_timeout_ms = 10000,
         .enable_close_reconnect = true,
         .disable_auto_reconnect = false,
         .task_stack = 2 * WS_BUF_SIZE,
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
     ws_client = esp_websocket_client_init(&ws_cfg);
     ESP_RETURN_ON_ERROR(esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DATA, ws_data_cb, NULL),

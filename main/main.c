@@ -16,8 +16,6 @@
 
 #define TAG "MAIN"
 
-static char cert_pem[4096] = {0};
-
 void app_main(void)
 {
     esp_err_t ret = ESP_OK;
@@ -38,12 +36,6 @@ void app_main(void)
     // read config
     ESP_GOTO_ON_ERROR(load_config(), err, TAG, "load_config failed.");
     print_config();
-    // load cert.pem
-    // FILE *certptr = NULL;
-    // ESP_GOTO_ON_FALSE(certptr = fopen(MOUNT_POINT "/cert.pem", "r"), ESP_FAIL, err, TAG, "cannot read cert.pem");
-    // fread(cert_pem, sizeof(cert_pem[0]), sizeof(cert_pem) / sizeof(cert_pem[0]), certptr);
-    // fclose(certptr);
-    // ESP_LOGI(TAG, "read cert.pem:\nlength: %zu", strlen(cert_pem));
 
     // camera
     ESP_GOTO_ON_ERROR(camera_init(), err, TAG, "camera_init failed.");
@@ -59,7 +51,7 @@ void app_main(void)
     ESP_GOTO_ON_ERROR(pwm_init(), err, TAG, "pwm_init failed.");
 
     // websocket
-    ESP_GOTO_ON_ERROR(websocket_init(cert_pem), err, TAG, "websocket_init failed.");
+    ESP_GOTO_ON_ERROR(websocket_init(), err, TAG, "websocket_init failed.");
 
     xTaskCreatePinnedToCoreWithCaps(ws_adc_tx_task, "ws_adc_tx_task", 4 * 1024 * 1024, NULL, 0, &ws_adc_tx_task_handle, 1, MALLOC_CAP_SPIRAM);
 
