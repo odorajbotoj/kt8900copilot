@@ -36,6 +36,13 @@ static const blink_step_t blink_error[] = {
     {LED_BLINK_HOLD, LED_STATE_OFF, 800},
     {LED_BLINK_LOOP, 0, 0},
 };
+static const blink_step_t blink_wifi_disconn[] = {
+    {LED_BLINK_RGB, SET_RGB(128, 0, 128), 0},
+    {LED_BLINK_BRIGHTNESS, LED_STATE_25_PERCENT, 0},
+    {LED_BLINK_HOLD, LED_STATE_ON, 200},
+    {LED_BLINK_HOLD, LED_STATE_OFF, 800},
+    {LED_BLINK_LOOP, 0, 0},
+};
 static const blink_step_t blink_yellow_3[] = {
     {LED_BLINK_RGB, SET_RGB(255, 255, 0), 0},
     {LED_BLINK_BRIGHTNESS, LED_STATE_25_PERCENT, 0},
@@ -57,6 +64,7 @@ blink_step_t const *led_indicator_blink_lists[] = {
     [BLINK_WHITE] = blink_white,
     [BLINK_DISCONN] = blink_disconn,
     [BLINK_ERROR] = blink_error,
+    [BLINK_WIFI_DISCONN] = blink_wifi_disconn,
     [BLINK_YELLOW_3] = blink_yellow_3,
     [BLINK_OFF] = blink_off,
     [BLINK_MAX] = NULL,

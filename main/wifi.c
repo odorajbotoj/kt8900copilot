@@ -3,10 +3,8 @@
 #define TAG "WIFI_CONN"
 
 #define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT BIT1
 
 static EventGroupHandle_t wifi_event_group;
-static int retry_num = 0;
 
 static void event_handler(void *arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
@@ -18,16 +16,9 @@ static void event_handler(void *arg, esp_event_base_t ev_base, int32_t ev_id, vo
         }
         else if (ev_id == WIFI_EVENT_STA_DISCONNECTED)
         {
-            if (retry_num < WIFI_MAX_RETRY)
-            {
-                esp_wifi_connect();
-                ++retry_num;
-                ESP_LOGI(TAG, "retry to connect to the AP");
-            }
-            else
-            {
-                xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
-            }
+            esp_wifi_connect();
+            led_indicator_start(led_handle, BLINK_WIFI_DISCONN);
+            ESP_LOGI(TAG, "retry to connect to the AP");
         }
     }
     else if (ev_base == IP_EVENT)
@@ -36,7 +27,7 @@ static void event_handler(void *arg, esp_event_base_t ev_base, int32_t ev_id, vo
         {
             ip_event_got_ip_t *ev = (ip_event_got_ip_t *)ev_data;
             ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&ev->ip_info.ip));
-            retry_num = 0;
+            led_indicator_stop(led_handle, BLINK_WIFI_DISCONN);
             xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
         }
     }
@@ -86,20 +77,17 @@ esp_err_t wifi_init(void)
     ESP_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_STA, &wifi_config), TAG, "Failed to set WiFi config.");
     // start
     ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "Failed to start WiFi.");
+    esp_wifi_set_ps(WIFI_PS_NONE);
     ESP_LOGI(TAG, "wifi_init_sta finished.");
     // wait for result
     EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
-                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+                                           WIFI_CONNECTED_BIT,
                                            pdFALSE,
                                            pdFALSE,
                                            portMAX_DELAY);
     if (bits & WIFI_CONNECTED_BIT)
     {
         ESP_LOGI(TAG, "connected to ap SSID:%s", app_config.wifi_ssid);
-    }
-    else if (bits & WIFI_FAIL_BIT)
-    {
-        ESP_LOGI(TAG, "Failed to connect to WiFi");
     }
     else
     {
