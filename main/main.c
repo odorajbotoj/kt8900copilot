@@ -52,10 +52,26 @@ void app_main(void)
 
     // websocket
     ESP_GOTO_ON_ERROR(websocket_init(), err, TAG, "websocket_init failed.");
+    ESP_GOTO_ON_ERROR(esp_websocket_client_start(ws_client), err, TAG, "cannot start websocket client.");
 
-    xTaskCreatePinnedToCoreWithCaps(ws_adc_tx_task, "ws_adc_tx_task", 4 * 1024 * 1024, NULL, 0, &ws_adc_tx_task_handle, 1, MALLOC_CAP_SPIRAM);
+    ws_send_queue_handle = xQueueCreate(16, sizeof(data_packet_t));
+    ESP_GOTO_ON_FALSE(ws_send_queue_handle, ESP_FAIL, err, TAG, "failed to create ws_send_queue_handle.");
+    pwm_write_queue_handle = xQueueCreate(16, sizeof(data_packet_t));
+    ESP_GOTO_ON_FALSE(pwm_write_queue_handle, ESP_FAIL, err, TAG, "failed to create pwm_write_queue_handle.");
+
+    xTaskCreatePinnedToCoreWithCaps(ws_send_task, "ws_send_task", 1024 * 1024, NULL, 1, &ws_send_task_handle, 1, MALLOC_CAP_SPIRAM);
+    xTaskCreatePinnedToCoreWithCaps(rig_tx_watchdog, "rig_tx_watchdog", 2 * 1024, NULL, 2, &ws_send_task_handle, 1, MALLOC_CAP_SPIRAM);
+    xTaskCreatePinnedToCoreWithCaps(adc_read_task, "adc_read_task", 1024 * 1024, NULL, 1, &adc_read_task_handle, 1, MALLOC_CAP_SPIRAM);
+    xTaskCreatePinnedToCoreWithCaps(pwm_write_task, "pwm_write_task", 1024 * 1024, NULL, 1, &pwm_write_task_handle, 1, MALLOC_CAP_SPIRAM);
 
     led_indicator_stop(led_handle, BLINK_YELLOW_3);
+    led_indicator_start(led_handle, BLINK_DISCONN);
+
+    while (!esp_websocket_client_is_connected(ws_client))
+    {
+        vTaskDelay(pdMS_TO_TICKS(1000)); // waiting...
+    }
+
     return;
 
 err:

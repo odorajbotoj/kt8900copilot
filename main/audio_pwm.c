@@ -2,6 +2,9 @@
 
 #define TAG "AUDIO_PWM"
 
+TaskHandle_t pwm_write_task_handle;
+QueueHandle_t pwm_write_queue_handle;
+
 esp_err_t pwm_init(void)
 {
     pwm_audio_config_t pwm_conf = {
@@ -15,8 +18,23 @@ esp_err_t pwm_init(void)
     };
 
     ESP_RETURN_ON_ERROR(pwm_audio_init(&pwm_conf), TAG, "Failed to init pwm audio.");
-    ESP_RETURN_ON_ERROR(pwm_audio_set_param(32000, 16, 1), TAG, "Failed to set pwm audio.");
+    ESP_RETURN_ON_ERROR(pwm_audio_set_param(16000, 16, 1), TAG, "Failed to set pwm audio.");
     ESP_RETURN_ON_ERROR(pwm_audio_start(), TAG, "Failed to start pwm audio.");
 
     return ESP_OK;
+}
+
+void pwm_write_task(void *arg)
+{
+    data_packet_t pkt;
+    size_t written_bytes = 0;
+    ESP_LOGI(TAG, "pwm_write_task runs into mainloop.");
+    for (;;)
+    {
+        if (xQueueReceive(pwm_write_queue_handle, &pkt, portMAX_DELAY))
+        {
+            pwm_audio_write(pkt.data, pkt.len, &written_bytes, portMAX_DELAY);
+            free(pkt.data);
+        }
+    }
 }
