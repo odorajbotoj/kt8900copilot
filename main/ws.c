@@ -156,7 +156,7 @@ static void ws_conn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
 static void ws_disconn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
     ws_state = WS_STAT_IDLE;
-    gpio_set_level(GPIO_PTT, RIG_PTT_OFF);
+    ptt_off();
     led_indicator_start(led_handle, BLINK_DISCONN);
 }
 // functions above are websocket (dis)connect event callbacks
