@@ -33,7 +33,7 @@ ws_key examplekey
 timezone CST-8
 ntp_server ntp.ntsc.ac.cn
 adc_offset -2300
-tx_limit_ms 120000
+tx_limit_ms 60000
 */
 
 extern app_config_t app_config;

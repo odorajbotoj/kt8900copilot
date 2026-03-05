@@ -144,7 +144,7 @@ esp_err_t load_config(void)
     strcpy(app_config.timezone, "CST-8");
     strcpy(app_config.ntp_server, "ntp.ntsc.ac.cn");
     app_config.adc_offset = -2300;
-    app_config.tx_limit_ms = 120000;
+    app_config.tx_limit_ms = 60000;
     // file not exist
     if (access(MOUNT_POINT "/conf.txt", F_OK) == -1)
     {
