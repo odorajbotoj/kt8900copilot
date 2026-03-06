@@ -16,6 +16,8 @@ Author: BG4QBF
 
 音频的采集通过 **ADC** , 而播放依赖 **LEDC PWM** . 音频采样率为 **16000Hz** , ADC 配置为 12bit 左移四位填充到 **16bit** , PWM 配置为 **16bit** .
 
+摄像头输出分辨率 **320x240** , 已完成测试的支持型号为 ov2640 . **不要使用软排线过长的摄像头, 经测试会干扰 WiFi 速度**
+
 ## KT-8900 RJ45 定义
 
 从主机正面看, RJ45 八线从左到右依此为:
@@ -119,9 +121,10 @@ wifi_password examplepass
 ws_server wss://example.net:1234/test
 ws_key examplekey
 timezone CST-8
-ntp_server ntp.ntsc.ac.cn
+ntp_server ntp.aliyun.com
 adc_offset -2300
 tx_limit_ms 60000
+enable_cam 1
 ```
 
 | 字段 | 解释 |
@@ -134,6 +137,7 @@ tx_limit_ms 60000
 | ntp_server | 授时服务器 ( NTP ) |
 | adc_offset | ADC 偏移校准 ( 一般不用修改, -2300 即可) |
 | tx_limit_ms | 发射限时, 超时强制松开 PTT 防止损坏电台. 单位毫秒. 建议小于 1 分钟 |
+| enable_cam | 是否开启摄像头, 0 为不开启, 1 为开启. 不开启摄像头时, 可以无需安装 ov2640 . |
 
 ## AIGC 内容告知
 
