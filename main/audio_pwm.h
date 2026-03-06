@@ -3,6 +3,7 @@
 #include "esp_check.h"
 
 #include "data_packet.h"
+#include "ws.h"
 
 #include "pwm_audio.h"
 

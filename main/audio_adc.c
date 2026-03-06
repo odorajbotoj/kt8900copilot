@@ -50,7 +50,7 @@ void adc_read_task(void *arg)
     ESP_LOGI(TAG, "adc_read_task runs into mainloop.");
     for (;;)
     {
-        while (ws_state != WS_STAT_IDLE || gpio_get_level(GPIO_CTRL) == RIG_CTRL_OFF)
+        while (ws_state != WS_STAT_IDLE || gpio_get_level(GPIO_CTRL) == RIG_CTRL_OFF || !esp_websocket_client_is_connected(ws_client))
         {
             vTaskDelay(pdMS_TO_TICKS(20)); // waiting
         }
