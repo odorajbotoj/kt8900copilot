@@ -21,6 +21,7 @@ typedef struct
     char ntp_server[128];
     int adc_offset;
     int tx_limit_ms;
+    bool enable_cam;
 } app_config_t;
 
 /*
@@ -31,9 +32,10 @@ wifi_password examplepass
 ws_server wss://example.net:1234/test
 ws_key examplekey
 timezone CST-8
-ntp_server ntp.ntsc.ac.cn
+ntp_server ntp.aliyun.com
 adc_offset -2300
 tx_limit_ms 60000
+enable_cam 0;
 */
 
 extern app_config_t app_config;

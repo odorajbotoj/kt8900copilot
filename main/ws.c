@@ -34,13 +34,21 @@ static inline void ptt_off(void)
 }
 void get_and_upload_img_task(void *arg)
 {
-    ws_state = WS_STAT_IMG;
     esp_err_t ret = ESP_OK;
+    camera_fb_t *fb = NULL;
+    if (!app_config.enable_cam)
+    {
+        send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_E_CAM_DISABLED);
+        ESP_LOGE(TAG, "camera is not enabled.");
+        ret = ESP_FAIL;
+        goto err;
+    }
+    ws_state = WS_STAT_IMG;
     led_indicator_start(led_handle, BLINK_WHITE);
     // refresh buffer
     esp_camera_fb_return(esp_camera_fb_get());
     // acquire a frame
-    camera_fb_t *fb = esp_camera_fb_get();
+    fb = esp_camera_fb_get();
     if (fb == NULL)
     {
         send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_E_IMG_NIL);
@@ -67,7 +75,8 @@ void get_and_upload_img_task(void *arg)
     ws_state = WS_STAT_IDLE;
     vTaskDelete(NULL);
 err:
-    esp_camera_fb_return(fb);
+    if (fb)
+        esp_camera_fb_return(fb);
     led_indicator_stop(led_handle, BLINK_WHITE);
     ESP_LOGE(TAG, "failed to upload image. error: %s", esp_err_to_name(ret));
     ws_state = WS_STAT_IDLE;

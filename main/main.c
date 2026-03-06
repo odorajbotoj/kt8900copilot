@@ -38,7 +38,8 @@ void app_main(void)
     print_config();
 
     // camera
-    ESP_GOTO_ON_ERROR(camera_init(), err, TAG, "camera_init failed.");
+    if (app_config.enable_cam)
+        ESP_GOTO_ON_ERROR(camera_init(), err, TAG, "camera_init failed.");
 
     // wifi
     ESP_GOTO_ON_ERROR(nvs_init(), err, TAG, "nvs_init failed.");

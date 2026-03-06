@@ -51,7 +51,8 @@ esp_err_t write_config(void)
             "timezone %s\n"
             "ntp_server %s\n"
             "adc_offset %d\n"
-            "tx_limit_ms %d",
+            "tx_limit_ms %d\n"
+            "enable_cam %d",
             app_config.wifi_ssid,
             app_config.wifi_password,
             app_config.ws_server,
@@ -59,7 +60,8 @@ esp_err_t write_config(void)
             app_config.timezone,
             app_config.ntp_server,
             app_config.adc_offset,
-            app_config.tx_limit_ms);
+            app_config.tx_limit_ms,
+            app_config.enable_cam);
     fputs(conf_str, conf_file);
     fclose(conf_file);
     return ESP_OK;
@@ -137,14 +139,19 @@ void parse_conf_line(const char *input, size_t len)
     {
         app_config.tx_limit_ms = atoi(valbuf);
     }
+    else if (0 == strcmp("enable_cam", keybuf))
+    {
+        app_config.enable_cam = (bool)atoi(valbuf);
+    }
 }
 
 esp_err_t load_config(void)
 {
     strcpy(app_config.timezone, "CST-8");
-    strcpy(app_config.ntp_server, "ntp.ntsc.ac.cn");
+    strcpy(app_config.ntp_server, "ntp.aliyun.com");
     app_config.adc_offset = -2300;
     app_config.tx_limit_ms = 60000;
+    app_config.enable_cam = false;
     // file not exist
     if (access(MOUNT_POINT "/conf.txt", F_OK) == -1)
     {
@@ -175,7 +182,8 @@ void print_config(void)
              "read config:\n"
              "wifi ssid: %s\nwifi password length: %zu\n"
              "ws server: %s\nws key length: %zu\n"
-             "timezone: %s\nntp server: %s\nadc offset: %d\ntx limit ms: %d",
+             "timezone: %s\nntp server: %s\nadc offset: %d\ntx limit ms: %d\n"
+             "enable cam: %d",
              app_config.wifi_ssid,
              strlen(app_config.wifi_password),
              app_config.ws_server,
@@ -183,5 +191,6 @@ void print_config(void)
              app_config.timezone,
              app_config.ntp_server,
              app_config.adc_offset,
-             app_config.tx_limit_ms);
+             app_config.tx_limit_ms,
+             app_config.enable_cam);
 }
