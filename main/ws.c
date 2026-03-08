@@ -9,6 +9,7 @@ volatile ws_state_t ws_state;
 TaskHandle_t ws_send_task_handle;
 TaskHandle_t rig_tx_watchdog_handle;
 TaskHandle_t get_and_upload_img_task_handle;
+TaskHandle_t play_pcm_task_handle;
 
 QueueHandle_t ws_send_queue_handle;
 
@@ -99,6 +100,48 @@ static inline esp_err_t edit_conf(const char *d, size_t len)
     ws_state = WS_STAT_IDLE;
     return ESP_OK;
 }
+void play_pcm_task(void *arg)
+{
+    esp_err_t ret = ESP_OK;
+    char *filenames = (char *)arg;
+    char *saveptr;
+    char *name = strtok_r(filenames, "/", &saveptr);
+    char full_filename[128];
+    strcpy(full_filename, MOUNT_POINT "/");
+    last_ptt_on = xTaskGetTickCount();
+    ptt_on();
+    vTaskDelay(pdMS_TO_TICKS(400));
+    while (name != NULL)
+    {
+        sprintf(full_filename, MOUNT_POINT "/pcm/%s.pcm", name);
+        FILE *f = NULL;
+        ESP_GOTO_ON_FALSE(f = fopen(full_filename, "r"), ESP_FAIL, err, TAG, "cannot open file %s", full_filename);
+        char read_buf[1024];
+        size_t read_bytes = 0;
+        while ((read_bytes = fread(read_buf, 1, sizeof(read_buf), f)))
+        {
+            send_to_queue(pwm_write_queue_handle, read_buf, read_bytes, 0);
+            vTaskDelay(pdMS_TO_TICKS(30));
+        }
+        fclose(f);
+        name = strtok_r(NULL, "/", &saveptr);
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));
+    ptt_off();
+    free(arg);
+    send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_S_PLAY);
+    ESP_LOGI(TAG, "play sounds ok.");
+    vTaskDelete(NULL);
+    return;
+
+err:
+    ptt_off();
+    free(arg);
+    send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_E_PLAY);
+    ESP_LOGI(TAG, "failed to play sounds: %s", esp_err_to_name(ret));
+    vTaskDelete(NULL);
+    return;
+}
 // functions above are for data processing callback
 
 // data processing callback
@@ -121,6 +164,19 @@ static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
             return;
         case CTRL_CODE_TX_STOP:
             ptt_off();
+            return;
+        case CTRL_CODE_PLAY:
+            char *filenames = malloc(data->data_len);
+            filenames[data->data_len - 1] = '\0';
+            memcpy(filenames, data->data_ptr + 1, data->data_len - 1);
+            xTaskCreatePinnedToCoreWithCaps(play_pcm_task,
+                                            "play_pcm_task",
+                                            16 * 1024,
+                                            filenames,
+                                            2,
+                                            &play_pcm_task_handle,
+                                            1,
+                                            MALLOC_CAP_SPIRAM);
             return;
         case CTRL_CODE_IMG_GET:
             xTaskCreatePinnedToCoreWithCaps(get_and_upload_img_task,
@@ -164,6 +220,10 @@ static void ws_conn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
 }
 static void ws_disconn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
+    if (get_and_upload_img_task_handle)
+        vTaskDelete(get_and_upload_img_task_handle);
+    if (play_pcm_task_handle)
+        vTaskDelete(play_pcm_task_handle);
     if (ws_state > WS_STAT_RX)
         ptt_off();
     led_indicator_start(led_handle, BLINK_DISCONN);
@@ -181,6 +241,10 @@ void ws_destroy_task(void *arg)
     }
     if (adc_read_task_handle)
         vTaskDelete(adc_read_task_handle);
+    if (get_and_upload_img_task_handle)
+        vTaskDelete(get_and_upload_img_task_handle);
+    if (play_pcm_task_handle)
+        vTaskDelete(play_pcm_task_handle);
     if (ws_send_task_handle)
         vTaskDelete(ws_send_task_handle);
     if (pwm_write_task_handle)
