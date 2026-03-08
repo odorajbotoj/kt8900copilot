@@ -1,9 +1,11 @@
 #pragma once
 
+// connection control
 #define CTRL_CODE_SKIP 0x00
 #define CTRL_CODE_VERIFY 0x01
 #define CTRL_CODE_REFUSE 0x02
 #define CTRL_CODE_CONN_BUSY 0x03
+// device control
 #define CTRL_CODE_RX 0x11
 #define CTRL_CODE_RX_STOP 0x12
 #define CTRL_CODE_TX 0x13
@@ -15,12 +17,15 @@
 #define CTRL_CODE_IMG_GET 0x19
 #define CTRL_CODE_SET_CONF 0x1A
 #define CTRL_CODE_RESET 0x1B
-#define CTRL_CODE_FROM 0x1C
-#define CTRL_CODE_ONLINE 0x1D
-#define CTRL_CODE_OFFLINE 0x1E
+// operation result
 #define CTRL_CODE_S_E_IMG_NIL 0x31
 #define CTRL_CODE_S_S_SET_CONF 0x32
 #define CTRL_CODE_S_E_SET_CONF 0x33
 #define CTRL_CODE_S_E_CAM_DISABLED 0x34
-#define CTRL_CODE_PCM 0x51
-#define CTRL_CODE_IMG 0x61
+// client status
+#define CTRL_CODE_FROM 0x51
+#define CTRL_CODE_ONLINE 0x52
+#define CTRL_CODE_OFFLINE 0x53
+// binary data
+#define CTRL_CODE_PCM 0x71
+#define CTRL_CODE_IMG 0x81
