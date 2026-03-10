@@ -33,8 +33,7 @@ void pwm_write_task(void *arg)
     {
         if (xQueueReceive(pwm_write_queue_handle, &pkt, portMAX_DELAY))
         {
-            if (esp_websocket_client_is_connected(ws_client))
-                pwm_audio_write(pkt.data, pkt.len, &written_bytes, portMAX_DELAY);
+            pwm_audio_write(pkt.data, pkt.len, &written_bytes, portMAX_DELAY);
             free(pkt.data);
         }
     }

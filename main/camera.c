@@ -28,9 +28,9 @@ esp_err_t camera_init(void)
         .ledc_channel = LEDC_CHANNEL_2, // 0 and 1 is used for pwm_audio
 
         .pixel_format = PIXFORMAT_JPEG,
-        .frame_size = FRAMESIZE_QVGA,
+        .frame_size = FRAMESIZE_VGA,
 
-        .jpeg_quality = 8,                  // 0-63, for OV series camera sensors, lower number means higher quality
+        .jpeg_quality = 4,                  // 0-63, for OV series camera sensors, lower number means higher quality
         .fb_count = 1,                      // When jpeg mode is used, if fb_count more than one, the driver will work in continuous mode.
         .grab_mode = CAMERA_GRAB_WHEN_EMPTY // CAMERA_GRAB_LATEST. Sets when buffers should be filled
     };
