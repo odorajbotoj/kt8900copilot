@@ -220,9 +220,9 @@ static void ws_conn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
 }
 static void ws_disconn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
-    if (get_and_upload_img_task_handle)
+    if (get_and_upload_img_task_handle && eTaskGetState(get_and_upload_img_task_handle) >= eDeleted)
         vTaskDelete(get_and_upload_img_task_handle);
-    if (play_pcm_task_handle)
+    if (play_pcm_task_handle && eTaskGetState(play_pcm_task_handle) >= eDeleted)
         vTaskDelete(play_pcm_task_handle);
     if (ws_state > WS_STAT_RX)
         ptt_off();
@@ -239,17 +239,17 @@ void ws_destroy_task(void *arg)
         esp_websocket_client_destroy(ws_client);
         ESP_LOGW(TAG, "connection refused, websocket client closed.");
     }
-    if (adc_read_task_handle)
+    if (adc_read_task_handle && eTaskGetState(adc_read_task_handle) >= eDeleted)
         vTaskDelete(adc_read_task_handle);
-    if (get_and_upload_img_task_handle)
+    if (get_and_upload_img_task_handle && eTaskGetState(get_and_upload_img_task_handle) >= eDeleted)
         vTaskDelete(get_and_upload_img_task_handle);
-    if (play_pcm_task_handle)
+    if (play_pcm_task_handle && eTaskGetState(play_pcm_task_handle) >= eDeleted)
         vTaskDelete(play_pcm_task_handle);
-    if (ws_send_task_handle)
+    if (ws_send_task_handle && eTaskGetState(ws_send_task_handle) >= eDeleted)
         vTaskDelete(ws_send_task_handle);
-    if (pwm_write_task_handle)
+    if (pwm_write_task_handle && eTaskGetState(pwm_write_task_handle) >= eDeleted)
         vTaskDelete(pwm_write_task_handle);
-    if (rig_tx_watchdog_handle)
+    if (rig_tx_watchdog_handle && eTaskGetState(rig_tx_watchdog_handle) >= eDeleted)
         vTaskDelete(rig_tx_watchdog_handle);
     vTaskDelete(NULL);
 }
