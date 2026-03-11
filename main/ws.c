@@ -118,10 +118,20 @@ void play_pcm_task(void *arg)
         ESP_GOTO_ON_FALSE(f = fopen(full_filename, "r"), ESP_FAIL, err, TAG, "cannot open file %s", full_filename);
         char read_buf[1024];
         size_t read_bytes = 0;
+        uint8_t time_fix_count = 0;
         while ((read_bytes = fread(read_buf, 1, sizeof(read_buf), f)))
         {
             send_to_queue(pwm_write_queue_handle, read_buf, read_bytes, 0);
             vTaskDelay(pdMS_TO_TICKS(30));
+            if (time_fix_count > 5)
+            {
+                vTaskDelay(pdMS_TO_TICKS(10));
+                time_fix_count = 0;
+            }
+            else
+            {
+                ++time_fix_count;
+            }
         }
         fclose(f);
         name = strtok_r(NULL, "/", &saveptr);
