@@ -32,4 +32,4 @@
 #define CTRL_CODE_OFFLINE 0x53
 // binary data
 #define CTRL_CODE_PCM 0x71
-#define CTRL_CODE_IMG 0x81
+#define CTRL_CODE_IMG 0x72
