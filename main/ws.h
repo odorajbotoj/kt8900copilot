@@ -11,6 +11,7 @@
 #include "led.h"
 #include "gpio.h"
 #include "audio_pwm.h"
+#include "afsk1200.h"
 
 #include "esp_camera.h"
 #include "esp_crt_bundle.h"

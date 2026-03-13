@@ -18,6 +18,7 @@
 #define CTRL_CODE_SET_CONF 0x1A
 #define CTRL_CODE_RESET 0x1B
 #define CTRL_CODE_PLAY 0x1C
+#define CTRL_CODE_AFSK 0x1D
 // operation result
 #define CTRL_CODE_S_MESSAGE 0x31
 #define CTRL_CODE_S_S_SET_CONF 0x32
