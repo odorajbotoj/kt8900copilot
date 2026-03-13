@@ -6,7 +6,7 @@
 void send_to_queue(QueueHandle_t handle, const void *data, size_t len, uint8_t code)
 {
     data_packet_t pkt;
-    if (!code)
+    if (code == 0 || code == 0xFF)
     {
         pkt.data = heap_caps_malloc(len, MALLOC_CAP_SPIRAM);
         if (!pkt.data)
@@ -16,10 +16,12 @@ void send_to_queue(QueueHandle_t handle, const void *data, size_t len, uint8_t c
         }
         memcpy(pkt.data, data, len);
         pkt.len = len;
-        pkt.code = 0;
+        pkt.code = code;
     }
     else
     {
+        pkt.data = NULL;
+        pkt.len = 0;
         pkt.code = code;
     }
     xQueueSend(handle, &pkt, 0);

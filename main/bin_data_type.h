@@ -5,6 +5,7 @@
 #define CTRL_CODE_VERIFY 0x01
 #define CTRL_CODE_REFUSE 0x02
 #define CTRL_CODE_CONN_BUSY 0x03
+#define CTRL_CODE_VERIFIED 0x04
 // device control
 #define CTRL_CODE_RX 0x11
 #define CTRL_CODE_RX_STOP 0x12
@@ -34,3 +35,5 @@
 // binary data
 #define CTRL_CODE_PCM 0x71
 #define CTRL_CODE_IMG 0x72
+// special
+#define CTRL_CODE_SPECIAL 0xFF

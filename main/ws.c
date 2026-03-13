@@ -5,6 +5,7 @@
 esp_websocket_client_handle_t ws_client;
 
 volatile ws_state_t ws_state;
+volatile bool verified_client;
 
 TaskHandle_t ws_send_task_handle;
 TaskHandle_t rig_tx_watchdog_handle;
@@ -413,7 +414,11 @@ static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
                 return;
             memcpy(random_verify, data->data_ptr + 1, 16);
             calculate_passkey();
-            send_to_queue(ws_send_queue_handle, app_passkey, 16, 0);
+            send_to_queue(ws_send_queue_handle, app_passkey, 16, CTRL_CODE_SPECIAL);
+            return;
+        case CTRL_CODE_VERIFIED:
+            verified_client = true;
+            ESP_LOGI(TAG, "client verified.");
             return;
         case CTRL_CODE_REFUSE:
             ESP_LOGE(TAG, "Server refused the connection.");
@@ -431,10 +436,12 @@ static void ws_conn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
 {
     led_indicator_stop(led_handle, BLINK_DISCONN);
     ESP_LOGI(TAG, "connected to server.");
-    send_to_queue(ws_send_queue_handle, device_mac_address, strlen(device_mac_address), 0);
+    verified_client = false;
+    send_to_queue(ws_send_queue_handle, device_mac_address, strlen(device_mac_address), CTRL_CODE_SPECIAL);
 }
 static void ws_disconn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
+    verified_client = false;
     if (get_and_upload_img_task_handle && eTaskGetState(get_and_upload_img_task_handle) < eDeleted)
         vTaskDelete(get_and_upload_img_task_handle);
     if (play_pcm_task_handle && eTaskGetState(play_pcm_task_handle) < eDeleted)
@@ -537,6 +544,8 @@ esp_err_t websocket_init()
                                     1,
                                     MALLOC_CAP_SPIRAM);
 
+    verified_client = false;
+
     return ESP_OK;
 }
 
@@ -562,9 +571,9 @@ void ws_send_task(void *arg)
     {
         if (xQueueReceive(ws_send_queue_handle, &pkt, portMAX_DELAY))
         {
-            if (esp_websocket_client_is_connected(ws_client))
+            if ((verified_client && esp_websocket_client_is_connected(ws_client)) || pkt.code == CTRL_CODE_SPECIAL)
             {
-                if (!pkt.code)
+                if (pkt.code == 0 || pkt.code == CTRL_CODE_SPECIAL)
                 {
                     esp_websocket_client_send_bin(ws_client, (const char *)pkt.data, pkt.len, portMAX_DELAY);
                     free(pkt.data);
