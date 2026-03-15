@@ -2,7 +2,7 @@
 
 #define TAG "WS_CB"
 
-volatile uint8_t ws_state;
+volatile uint8_t ws_state = 0;
 
 EventGroupHandle_t ws_event_group;
 TickType_t last_ptt_on; // used for calculating tx time limit
