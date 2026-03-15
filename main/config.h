@@ -4,8 +4,6 @@
 
 #include "esp_check.h"
 
-#include "utils.h"
-
 #include "sdcard.h"
 
 #include "esp_mac.h"

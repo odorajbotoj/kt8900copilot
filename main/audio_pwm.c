@@ -4,6 +4,7 @@
 
 TaskHandle_t pwm_write_task_handle;
 QueueHandle_t pwm_write_queue_handle;
+TickType_t last_pwm_write;
 
 esp_err_t pwm_init(void)
 {
@@ -33,6 +34,7 @@ void pwm_write_task(void *arg)
     {
         if (xQueueReceive(pwm_write_queue_handle, &pkt, portMAX_DELAY))
         {
+            last_pwm_write = xTaskGetTickCount();
             pwm_audio_write(pkt.data, pkt.len, &written_bytes, portMAX_DELAY);
             free(pkt.data);
         }

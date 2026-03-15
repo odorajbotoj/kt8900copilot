@@ -1,7 +1,5 @@
 #include "esp_check.h"
 
-#include "utils.h"
-
 #include "config.h"
 
 #include "led.h"

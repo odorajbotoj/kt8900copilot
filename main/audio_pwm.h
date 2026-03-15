@@ -10,6 +10,7 @@
 #define PWM_BUF_SIZE 1024
 
 extern QueueHandle_t pwm_write_queue_handle;
+extern TickType_t last_pwm_write;
 
 esp_err_t pwm_init(void);
 void pwm_write_task(void *arg);

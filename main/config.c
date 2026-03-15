@@ -7,6 +7,16 @@ char device_mac_address[24] = {0};
 uint8_t random_verify[16] = {0};
 uint8_t app_passkey[16] = {0};
 
+static inline void remove_right_space(char *s)
+{
+    char *c = &(s[strlen(s) - 1]);
+    while (*c == '\n' || *c == '\r' || *c == '\t' || *c == ' ')
+    {
+        *c = '\0';
+        --c;
+    }
+}
+
 void get_mac(void)
 {
     uint8_t mac[8];
