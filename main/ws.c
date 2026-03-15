@@ -21,7 +21,7 @@ static void handle_data(void)
     switch (*(header_buf))
     {
     case CTRL_CODE_PCM:
-        if (ws_state == WS_STAT_TX)
+        if (GET_STATE(WS_STAT_TX))
         {
             send_to_queue(pwm_write_queue_handle, payload_buf, payload_len);
         }
@@ -76,7 +76,7 @@ static void handle_data(void)
 static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)ev_data;
-    if (ws_state <= WS_STAT_TX && data->op_code == 0x02 && data->data_ptr)
+    if (!(ws_state > (1 << WS_STAT_TX)) && data->op_code == 0x02 && data->data_ptr)
     {
         for (size_t i = 0; i < data->data_len; ++i)
         {
@@ -116,7 +116,7 @@ void ws_destroy_task(void *arg)
             esp_websocket_client_stop(ws_client);
             esp_websocket_client_destroy(ws_client);
             ESP_LOGW(TAG, "connection refused, websocket client closed.");
-            if (ws_state > WS_STAT_RX)
+            if (ws_state > (1 << WS_STAT_RX))
                 ptt_off();
             if (adc_read_task_handle && eTaskGetState(adc_read_task_handle) < eDeleted)
                 vTaskDelete(adc_read_task_handle);
@@ -206,7 +206,7 @@ void rig_tx_watchdog(void *arg)
     for (;;)
     {
         vTaskDelay(pdMS_TO_TICKS(100));
-        if (ws_state == WS_STAT_TX)
+        if (GET_STATE(WS_STAT_TX))
         {
             if (app_config.tx_limit_ms > 0 && xTaskGetTickCount() - last_ptt_on > pdMS_TO_TICKS(app_config.tx_limit_ms))
             {

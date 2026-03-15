@@ -18,7 +18,9 @@ typedef enum
     WS_STAT_IMG,
     WS_STAT_CFG,
 } ws_state_t;
-extern volatile ws_state_t ws_state;
+extern volatile uint8_t ws_state;
+#define SET_STATE(s, v) (ws_state = (ws_state & ~(1 << (s))) | ((v) << (s)))
+#define GET_STATE(s) ((ws_state >> (s)) & 1)
 
 extern EventGroupHandle_t ws_event_group;
 #define WS_EVT_REFUSE_BIT BIT0

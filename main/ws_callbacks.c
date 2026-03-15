@@ -2,7 +2,7 @@
 
 #define TAG "WS_CB"
 
-volatile ws_state_t ws_state;
+volatile uint8_t ws_state;
 
 EventGroupHandle_t ws_event_group;
 TickType_t last_ptt_on; // used for calculating tx time limit
@@ -17,14 +17,14 @@ volatile bool verified_client;
 inline void ptt_on(void)
 {
     last_pwm_write = last_ptt_on = xTaskGetTickCount();
-    ws_state = WS_STAT_TX;
+    SET_STATE(WS_STAT_TX, 1);
     ESP_LOGI(TAG, "RIG TX ON");
     led_indicator_start(led_handle, BLINK_RED);
     gpio_set_level(GPIO_PTT, RIG_PTT_ON);
 }
 inline void ptt_off(void)
 {
-    ws_state = WS_STAT_IDLE;
+    SET_STATE(WS_STAT_TX, 0);
     ESP_LOGI(TAG, "RIG TX OFF");
     led_indicator_stop(led_handle, BLINK_RED);
     gpio_set_level(GPIO_PTT, RIG_PTT_OFF);
@@ -48,7 +48,7 @@ void get_and_upload_img_task(void *arg)
                 ret = ESP_FAIL;
                 goto err;
             }
-            ws_state = WS_STAT_IMG;
+            SET_STATE(WS_STAT_IMG, 1);
             led_indicator_start(led_handle, BLINK_WHITE);
             // refresh buffer
             esp_camera_fb_return(esp_camera_fb_get());
@@ -74,35 +74,35 @@ void get_and_upload_img_task(void *arg)
             // free
             esp_camera_fb_return(fb);
             led_indicator_stop(led_handle, BLINK_WHITE);
-            ws_state = WS_STAT_IDLE;
+            SET_STATE(WS_STAT_IMG, 0);
             ESP_LOGI(TAG, "IMG UPLOADED");
             continue;
         err:
             if (fb)
                 esp_camera_fb_return(fb);
             led_indicator_stop(led_handle, BLINK_WHITE);
-            ws_state = WS_STAT_IDLE;
+            SET_STATE(WS_STAT_IMG, 0);
             ESP_LOGE(TAG, "failed to upload image. error: %s", esp_err_to_name(ret));
         }
     }
 }
 inline esp_err_t edit_conf(const char *d, size_t len)
 {
-    ws_state = WS_STAT_CFG;
+    SET_STATE(WS_STAT_CFG, 1);
     parse_conf_line(d, len);
     esp_err_t e = write_config();
     if (e != ESP_OK)
     {
         send_to_ws(NULL, 0, CTRL_CODE_S_E_SET_CONF);
         ESP_LOGE(TAG, "failed to set config.");
-        ws_state = WS_STAT_IDLE;
+        SET_STATE(WS_STAT_CFG, 0);
         return e;
     }
     send_to_ws(NULL, 0, CTRL_CODE_S_S_SET_CONF);
     ESP_LOGI(TAG, "SET CONF:");
     print_config();
     ESP_LOGI(TAG, "SET CONF DONE");
-    ws_state = WS_STAT_IDLE;
+    SET_STATE(WS_STAT_CFG, 0);
     return ESP_OK;
 }
 void play_pcm_task(void *arg)
@@ -379,7 +379,7 @@ void ws_disconn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *
         vTaskDelete(play_pcm_task_handle);
     if (afsk_send_task_handle && eTaskGetState(afsk_send_task_handle) < eDeleted)
         vTaskDelete(afsk_send_task_handle);
-    if (ws_state > WS_STAT_RX)
+    if (ws_state > (1 << WS_STAT_RX))
         ptt_off();
     led_indicator_start(led_handle, BLINK_DISCONN);
 }
