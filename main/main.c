@@ -56,7 +56,7 @@ void app_main(void)
     led_indicator_stop(led_handle, BLINK_YELLOW_3);
     led_indicator_start(led_handle, BLINK_DISCONN);
 
-    ws_send_queue_handle = xQueueCreate(16, sizeof(data_packet_t));
+    ws_send_queue_handle = xQueueCreate(16, sizeof(ws_data_packet_t));
     ESP_GOTO_ON_FALSE(ws_send_queue_handle, ESP_FAIL, err, TAG, "failed to create ws_send_queue_handle.");
     pwm_write_queue_handle = xQueueCreate(16, sizeof(data_packet_t));
     ESP_GOTO_ON_FALSE(pwm_write_queue_handle, ESP_FAIL, err, TAG, "failed to create pwm_write_queue_handle.");

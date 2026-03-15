@@ -144,7 +144,7 @@ void afsk1200_to_pwm(uint8_t *source, size_t bit_len)
     bool decreasing = false;
     int16_t send_buf[512] = {0};
     size_t send_buf_write_index;
-    send_to_queue(pwm_write_queue_handle, send_buf, sizeof(send_buf), 0);
+    send_to_queue(pwm_write_queue_handle, send_buf, sizeof(send_buf));
     vTaskDelay(pdMS_TO_TICKS(20));
     for (size_t i = 0; i < bit_len; i += 36) // every 36 bits
     {
@@ -202,10 +202,10 @@ void afsk1200_to_pwm(uint8_t *source, size_t bit_len)
             if (point_count >= 3)
                 point_count = 0;
         }
-        send_to_queue(pwm_write_queue_handle, send_buf, send_buf_write_index * 2, 0); // write to pwm
-        vTaskDelay(pdMS_TO_TICKS(30));                                                // equals to (36/3*40) / (16000/1000)
+        send_to_queue(pwm_write_queue_handle, send_buf, send_buf_write_index * 2); // write to pwm
+        vTaskDelay(pdMS_TO_TICKS(30));                                             // equals to (36/3*40) / (16000/1000)
     }
     memset(send_buf, 0, sizeof(send_buf));
-    send_to_queue(pwm_write_queue_handle, send_buf, sizeof(send_buf), 0);
+    send_to_queue(pwm_write_queue_handle, send_buf, sizeof(send_buf));
     vTaskDelay(pdMS_TO_TICKS(30));
 }

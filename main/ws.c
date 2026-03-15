@@ -10,61 +10,97 @@ TaskHandle_t get_and_upload_img_task_handle;
 TaskHandle_t play_pcm_task_handle;
 TaskHandle_t afsk_send_task_handle;
 
+static uint8_t header_buf[3] = {0};
+static uint8_t header_pos = 0;
+static uint8_t payload_buf[8192] = {0};
+static uint16_t payload_len = 0;
+static uint16_t payload_pos = 0;
+
+static void handle_data(void)
+{
+    switch (*(header_buf))
+    {
+    case CTRL_CODE_PCM:
+        if (ws_state == WS_STAT_TX)
+        {
+            send_to_queue(pwm_write_queue_handle, payload_buf, payload_len);
+        }
+        return;
+    case CTRL_CODE_TX:
+        ptt_on();
+        return;
+    case CTRL_CODE_TX_STOP:
+        ptt_off();
+        return;
+    case CTRL_CODE_PLAY:
+        send_to_queue(ws_task_play_queue_handle, payload_buf, payload_len);
+        return;
+    case CTRL_CODE_AFSK:
+        ESP_RETURN_VOID_ON_FALSE(payload_len > 1, TAG, "invalid AFSK packet.");
+        send_to_queue(ws_task_afsk_queue_handle, payload_buf, payload_len);
+        return;
+    case CTRL_CODE_IMG_GET:
+        xEventGroupSetBits(ws_event_group, WS_EVT_CALL_IMG_BIT);
+        return;
+    case CTRL_CODE_SET_CONF:
+        ESP_RETURN_VOID_ON_ERROR(edit_conf((const char *)payload_buf, payload_len), TAG, "edit_conf failed.");
+        return;
+    case CTRL_CODE_RESET:
+        ESP_LOGW(TAG, "get restart.");
+        esp_restart();
+        return;
+    case CTRL_CODE_VERIFY:
+        if (payload_len != 16)
+            return;
+        memcpy(random_verify, payload_buf, 16);
+        calculate_passkey();
+        send_to_ws(app_passkey, 16, CTRL_CODE_PASSTHROUGH);
+        return;
+    case CTRL_CODE_VERIFIED:
+        verified_client = true;
+        ESP_LOGI(TAG, "client verified.");
+        return;
+    case CTRL_CODE_REFUSE:
+        ESP_LOGE(TAG, "Server refused the connection.");
+        xEventGroupSetBits(ws_event_group, WS_EVT_REFUSE_BIT);
+        return;
+    case CTRL_CODE_CONN_BUSY:
+        ESP_LOGE(TAG, "Server returned: the connection is busy. please wait a minute");
+        return;
+    default:
+        ESP_LOGW(TAG, "unhandled packet with code: %x", *(header_buf));
+    }
+}
+
 // data processing callback
 static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)ev_data;
     if (ws_state <= WS_STAT_TX && data->op_code == 0x02 && data->data_ptr)
     {
-        switch (*(data->data_ptr))
+        for (size_t i = 0; i < data->data_len; ++i)
         {
-        case CTRL_CODE_PCM:
-            if (ws_state == WS_STAT_TX)
+            if (header_pos < 3)
             {
-                send_to_queue(pwm_write_queue_handle, data->data_ptr + 1, (data->data_len) - 1, 0);
+                header_buf[header_pos++] = data->data_ptr[i];
+                if (header_pos == 3)
+                {
+                    payload_len = header_buf[1] | (header_buf[2] << 8);
+                    payload_pos = 0;
+                    if (payload_len == 0)
+                    {
+                        header_pos = 0;
+                        handle_data();
+                    }
+                }
+                continue;
             }
-            return;
-        case CTRL_CODE_TX:
-            ptt_on();
-            return;
-        case CTRL_CODE_TX_STOP:
-            ptt_off();
-            return;
-        case CTRL_CODE_PLAY:
-            send_to_queue(ws_task_play_queue_handle, data->data_ptr + 1, data->data_len - 1, 0);
-            return;
-        case CTRL_CODE_AFSK:
-            ESP_RETURN_VOID_ON_FALSE(data->data_len > 2, TAG, "invalid AFSK packet.");
-            send_to_queue(ws_task_afsk_queue_handle, data->data_ptr + 1, data->data_len - 1, 0);
-            return;
-        case CTRL_CODE_IMG_GET:
-            xEventGroupSetBits(ws_event_group, WS_EVT_CALL_IMG_BIT);
-            return;
-        case CTRL_CODE_SET_CONF:
-            ESP_RETURN_VOID_ON_ERROR(edit_conf(data->data_ptr + 1, data->data_len - 1), TAG, "edit_conf failed.");
-            return;
-        case CTRL_CODE_RESET:
-            ESP_LOGW(TAG, "get restart.");
-            esp_restart();
-            return;
-        case CTRL_CODE_VERIFY:
-            if (data->data_len != 17)
-                return;
-            memcpy(random_verify, data->data_ptr + 1, 16);
-            calculate_passkey();
-            send_to_queue(ws_send_queue_handle, app_passkey, 16, CTRL_CODE_PASSTHROUGH);
-            return;
-        case CTRL_CODE_VERIFIED:
-            verified_client = true;
-            ESP_LOGI(TAG, "client verified.");
-            return;
-        case CTRL_CODE_REFUSE:
-            ESP_LOGE(TAG, "Server refused the connection.");
-            xEventGroupSetBits(ws_event_group, WS_EVT_REFUSE_BIT);
-            return;
-        case CTRL_CODE_CONN_BUSY:
-            ESP_LOGE(TAG, "Server returned: the connection is busy. please wait a minute");
-            return;
+            payload_buf[payload_pos++] = data->data_ptr[i];
+            if (payload_pos >= payload_len)
+            {
+                header_pos = 0;
+                handle_data();
+            }
         }
     }
 }
@@ -190,8 +226,8 @@ void rig_tx_watchdog(void *arg)
 
 void ws_send_task(void *arg)
 {
-    data_packet_t pkt;
-    char code_temp[1];
+    ws_data_packet_t pkt;
+    char code_temp[3] = {0};
     ESP_LOGI(TAG, "ws_send_task runs into mainloop.");
     for (;;)
     {
@@ -199,15 +235,15 @@ void ws_send_task(void *arg)
         {
             if ((verified_client && esp_websocket_client_is_connected(ws_client)) || pkt.code == CTRL_CODE_PASSTHROUGH)
             {
-                if (pkt.code == 0 || pkt.code == CTRL_CODE_PASSTHROUGH)
+                if (pkt.data == NULL)
                 {
-                    esp_websocket_client_send_bin(ws_client, (const char *)pkt.data, pkt.len, portMAX_DELAY);
-                    free(pkt.data);
+                    code_temp[0] = pkt.code;
+                    esp_websocket_client_send_bin(ws_client, (const char *)code_temp, 3, portMAX_DELAY);
                 }
                 else
                 {
-                    code_temp[0] = pkt.code;
-                    esp_websocket_client_send_bin(ws_client, (const char *)code_temp, 1, portMAX_DELAY);
+                    esp_websocket_client_send_bin(ws_client, (const char *)pkt.data, pkt.len, portMAX_DELAY);
+                    free(pkt.data);
                 }
             }
         }

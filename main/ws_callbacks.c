@@ -34,7 +34,6 @@ void get_and_upload_img_task(void *arg)
     EventBits_t bits;
     esp_err_t ret;
     camera_fb_t *fb = NULL;
-    char buf[WS_BUF_SIZE] = {CTRL_CODE_IMG, 0};
     ESP_LOGI(TAG, "get_and_upload_img_task runs into mainloop.");
     for (;;)
     {
@@ -44,7 +43,7 @@ void get_and_upload_img_task(void *arg)
             ret = ESP_OK;
             if (!app_config.enable_cam)
             {
-                send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_E_CAM_DISABLED);
+                send_to_ws(NULL, 0, CTRL_CODE_S_E_CAM_DISABLED);
                 ESP_LOGE(TAG, "camera is not enabled.");
                 ret = ESP_FAIL;
                 goto err;
@@ -57,22 +56,21 @@ void get_and_upload_img_task(void *arg)
             fb = esp_camera_fb_get();
             if (fb == NULL)
             {
-                send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_E_IMG_NIL);
+                send_to_ws(NULL, 0, CTRL_CODE_S_E_IMG_NIL);
                 ESP_GOTO_ON_FALSE(fb, ESP_FAIL, err, TAG, "Camera Capture Failed");
                 goto err;
             }
             // begin
-            send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_IMG_UPLOAD);
+            send_to_ws(NULL, 0, CTRL_CODE_IMG_UPLOAD);
             // sending
             for (size_t i = 0; i < fb->len; i += WS_BUF_SIZE - 1)
             {
                 size_t valid_len = fb->len - i >= WS_BUF_SIZE - 1 ? WS_BUF_SIZE - 1 : fb->len - i;
-                memcpy(buf + 1, (fb->buf) + i, valid_len);
-                send_to_queue(ws_send_queue_handle, buf, valid_len + 1, 0);
+                send_to_ws((fb->buf) + i, valid_len, CTRL_CODE_IMG);
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
             // end
-            send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_IMG_UPLOAD_STOP);
+            send_to_ws(NULL, 0, CTRL_CODE_IMG_UPLOAD_STOP);
             // free
             esp_camera_fb_return(fb);
             led_indicator_stop(led_handle, BLINK_WHITE);
@@ -95,12 +93,12 @@ inline esp_err_t edit_conf(const char *d, size_t len)
     esp_err_t e = write_config();
     if (e != ESP_OK)
     {
-        send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_E_SET_CONF);
+        send_to_ws(NULL, 0, CTRL_CODE_S_E_SET_CONF);
         ESP_LOGE(TAG, "failed to set config.");
         ws_state = WS_STAT_IDLE;
         return e;
     }
-    send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_S_SET_CONF);
+    send_to_ws(NULL, 0, CTRL_CODE_S_S_SET_CONF);
     ESP_LOGI(TAG, "SET CONF:");
     print_config();
     ESP_LOGI(TAG, "SET CONF DONE");
@@ -138,7 +136,7 @@ void play_pcm_task(void *arg)
                 while ((read_bytes = fread(read_buf, 1, sizeof(read_buf), f)))
                 {
                     ++time_compensation_count;
-                    send_to_queue(pwm_write_queue_handle, read_buf, read_bytes, 0);
+                    send_to_queue(pwm_write_queue_handle, read_buf, read_bytes);
                     vTaskDelay(pdMS_TO_TICKS(30));
                     if (time_compensation_count > 5)
                     {
@@ -153,7 +151,7 @@ void play_pcm_task(void *arg)
             ptt_off();
             free(pkt.data);
             free(filenames);
-            send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_S_PLAY);
+            send_to_ws(NULL, 0, CTRL_CODE_S_S_PLAY);
             ESP_LOGI(TAG, "play sounds ok.");
             continue;
 
@@ -161,7 +159,7 @@ void play_pcm_task(void *arg)
             ptt_off();
             free(pkt.data);
             free(filenames);
-            send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_S_E_PLAY);
+            send_to_ws(NULL, 0, CTRL_CODE_S_E_PLAY);
             ESP_LOGI(TAG, "failed to play sounds: %s", esp_err_to_name(ret));
         }
     }
@@ -370,7 +368,7 @@ void ws_conn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_
     led_indicator_stop(led_handle, BLINK_DISCONN);
     ESP_LOGI(TAG, "connected to server.");
     verified_client = false;
-    send_to_queue(ws_send_queue_handle, device_mac_address, strlen(device_mac_address), CTRL_CODE_PASSTHROUGH);
+    send_to_ws(device_mac_address, strlen(device_mac_address), CTRL_CODE_PASSTHROUGH);
 }
 void ws_disconn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {

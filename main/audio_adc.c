@@ -41,8 +41,7 @@ esp_err_t adc_init(void)
 void adc_read_task(void *arg)
 {
     adc_continuous_data_t adc_read_buf[ADC_BUF_SIZE] = {0}; // 样本缓冲区
-    int16_t ws_send_buf[ADC_BUF_SIZE + 1] = {0};            // 待发数据缓冲区
-    *(((char *)ws_send_buf) + 1) = CTRL_CODE_PCM;           // set header
+    int16_t ws_send_buf[ADC_BUF_SIZE] = {0};                // 待发数据缓冲区
     uint32_t read_samples = 0;                              // 读取到的样本数
     esp_err_t err;
     bool ctrl_level;
@@ -54,7 +53,7 @@ void adc_read_task(void *arg)
         {
             vTaskDelay(pdMS_TO_TICKS(20)); // waiting
         }
-        send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_RX);
+        send_to_ws(NULL, 0, CTRL_CODE_RX);
         ESP_LOGI(TAG, "RIG RX ON");
         led_indicator_start(led_handle, BLINK_GREEN);
         ctrl_level = gpio_get_level(GPIO_CTRL) == RIG_CTRL_ON;
@@ -72,7 +71,7 @@ void adc_read_task(void *arg)
                 {
                     if (adc_read_buf[i].valid)
                     {
-                        ws_send_buf[i + 1] = ((int16_t)(adc_read_buf[i].raw_data) + app_config.adc_offset) << 4; // process samples
+                        ws_send_buf[i] = ((int16_t)(adc_read_buf[i].raw_data) + app_config.adc_offset) << 4; // process samples
                     }
                 }
                 if (ws_state != WS_STAT_IDLE || !esp_websocket_client_is_connected(ws_client))
@@ -80,14 +79,14 @@ void adc_read_task(void *arg)
                     vTaskDelay(pdMS_TO_TICKS(100));
                     break;
                 }
-                send_to_queue(ws_send_queue_handle, ((const char *)ws_send_buf) + 1, read_samples * 2 + 1, 0);
+                send_to_ws(ws_send_buf, read_samples * 2, CTRL_CODE_PCM);
             }
             --ctrl_off_delay;
             ctrl_level = gpio_get_level(GPIO_CTRL) == RIG_CTRL_ON;
         }
         led_indicator_stop(led_handle, BLINK_GREEN);
         ESP_LOGI(TAG, "RIG RX OFF");
-        send_to_queue(ws_send_queue_handle, NULL, 0, CTRL_CODE_RX_STOP);
+        send_to_ws(NULL, 0, CTRL_CODE_RX_STOP);
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

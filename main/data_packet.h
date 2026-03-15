@@ -45,11 +45,20 @@
 // special
 #define CTRL_CODE_PASSTHROUGH 0xFF
 
+extern QueueHandle_t ws_send_queue_handle;
+
+typedef struct
+{
+    uint8_t *data;
+    size_t len;
+} data_packet_t;
+
 typedef struct
 {
     uint8_t *data;
     size_t len;
     uint8_t code;
-} data_packet_t;
+} ws_data_packet_t;
 
-void send_to_queue(QueueHandle_t handle, const void *data, size_t len, uint8_t code);
+void send_to_queue(QueueHandle_t handle, const void *data, size_t len);
+void send_to_ws(const void *data, size_t len, uint8_t code);

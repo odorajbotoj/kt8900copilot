@@ -26,7 +26,6 @@ extern EventGroupHandle_t ws_event_group;
 
 extern TickType_t last_ptt_on;
 
-extern QueueHandle_t ws_send_queue_handle;
 extern QueueHandle_t ws_task_play_queue_handle;
 extern QueueHandle_t ws_task_afsk_queue_handle;
 
