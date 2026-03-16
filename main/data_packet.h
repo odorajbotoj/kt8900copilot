@@ -29,6 +29,8 @@
 #define CTRL_CODE_S_E_CAM_DISABLED 0x34
 #define CTRL_CODE_S_S_PLAY 0x35
 #define CTRL_CODE_S_E_PLAY 0x36
+#define CTRL_CODE_S_S_AFSK 0x37
+#define CTRL_CODE_S_E_AFSK 0x38
 // client status
 #define CTRL_CODE_FROM 0x51
 #define CTRL_CODE_ONLINE 0x52

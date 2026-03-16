@@ -79,19 +79,23 @@ inline esp_err_t edit_conf(const char *d, size_t len)
 void play_pcm_task(void *arg)
 {
     data_packet_t pkt;
-    esp_err_t ret;
     char *saveptr;
     char *name;
     char full_filename[128];
+    char err_info[160];
     ESP_LOGI(TAG, "play_pcm_task runs into mainloop.");
     for (;;)
     {
         if (xQueueReceive(ws_task_play_queue_handle, &pkt, portMAX_DELAY))
         {
             ws_state_set(WS_STAT_PLAY, true);
-            ret = ESP_OK;
             char *filenames = heap_caps_malloc(pkt.len + 1, MALLOC_CAP_SPIRAM);
-            ESP_GOTO_ON_FALSE(filenames, ESP_FAIL, err, TAG, "cannot process PLAY packet: heap_caps_malloc failed.");
+            if (!filenames)
+            {
+                ESP_LOGE(TAG, "cannot process PLAY packet: heap_caps_malloc failed.");
+                send_to_ws("cannot process PLAY packet: heap_caps_malloc failed.", 52, CTRL_CODE_S_MESSAGE);
+                goto err;
+            }
             filenames[pkt.len] = '\0';
             memcpy(filenames, pkt.data, pkt.len);
             name = strtok_r(filenames, "/", &saveptr);
@@ -101,7 +105,14 @@ void play_pcm_task(void *arg)
             {
                 sprintf(full_filename, MOUNT_POINT "/pcm/%s.pcm", name);
                 FILE *f = NULL;
-                ESP_GOTO_ON_FALSE(f = fopen(full_filename, "r"), ESP_FAIL, err, TAG, "cannot open file %s", full_filename);
+                f = fopen(full_filename, "r");
+                if (!f)
+                {
+                    ESP_LOGE(TAG, "cannot open file %s", full_filename);
+                    sprintf(err_info, "cannot open file %s", full_filename);
+                    send_to_ws(err_info, strlen(err_info), CTRL_CODE_S_MESSAGE);
+                    goto err;
+                }
                 char read_buf[1024];
                 size_t read_bytes = 0;
                 uint8_t time_compensation_count = 0;
@@ -133,7 +144,7 @@ void play_pcm_task(void *arg)
             free(pkt.data);
             free(filenames);
             send_to_ws(NULL, 0, CTRL_CODE_S_E_PLAY);
-            ESP_LOGI(TAG, "failed to play sounds: %s", esp_err_to_name(ret));
+            ESP_LOGI(TAG, "failed to play sounds.");
             ws_state_set(WS_STAT_PLAY, false);
         }
     }
@@ -161,12 +172,16 @@ void afsk_send_task(void *arg)
                 if (afsk_data.len < 3)
                 {
                     ESP_LOGE(TAG, "invalid afsk data: data too short.");
+                    send_to_ws("invalid afsk data: data too short.", 34, CTRL_CODE_S_MESSAGE);
+                    send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                     goto clean;
                 }
                 uint16_t bit_len = (uint16_t)(afsk_data.data[1]) + ((uint16_t)(afsk_data.data[2]) << 8);
                 if (bit_len > (afsk_data.len - 3) * 8)
                 {
                     ESP_LOGE(TAG, "invalid afsk data: binary stream too short.");
+                    send_to_ws("invalid afsk data: binary stream too short.", 43, CTRL_CODE_S_MESSAGE);
+                    send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                     goto clean;
                 }
 
@@ -175,7 +190,7 @@ void afsk_send_task(void *arg)
                 afsk1200_to_pwm(afsk_data.data + 3, bit_len);
                 vTaskDelay(pdMS_TO_TICKS(300));
                 ptt_off();
-
+                send_to_ws(NULL, 0, CTRL_CODE_S_S_AFSK);
                 goto clean;
             case AFSK_DATA_APRS:
                 // build aprs packet
@@ -192,11 +207,15 @@ void afsk_send_task(void *arg)
                         if (set_tocall)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: reset tocall.");
+                            send_to_ws("invalid afsk data: reset tocall.", 32, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         if (index + 7 > afsk_data.len)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: broken tocall.");
+                            send_to_ws("invalid afsk data: broken tocall.", 33, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         aprs_address[0] = afsk_data.data[index++] << 1;
@@ -208,6 +227,8 @@ void afsk_send_task(void *arg)
                         if (afsk_data.data[index] >= 16)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: invalid tocall ssid.");
+                            send_to_ws("invalid afsk data: invalid tocall ssid.", 39, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         aprs_address[6] = (afsk_data.data[index++] << 1) | 0b11100000;
@@ -217,11 +238,15 @@ void afsk_send_task(void *arg)
                         if (set_fromcall)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: reset fromcall.");
+                            send_to_ws("invalid afsk data: reset fromcall.", 34, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         if (index + 7 > afsk_data.len)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: broken fromcall.");
+                            send_to_ws("invalid afsk data: broken fromcall.", 35, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         aprs_address[7] = afsk_data.data[index++] << 1;
@@ -233,6 +258,8 @@ void afsk_send_task(void *arg)
                         if (afsk_data.data[index] >= 16)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: invalid fromcall ssid.");
+                            send_to_ws("invalid afsk data: invalid fromcall ssid.", 41, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         aprs_address[13] = (afsk_data.data[index++] << 1) | 0b01100000;
@@ -242,11 +269,15 @@ void afsk_send_task(void *arg)
                         if (path_len >= 8)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: too many path.");
+                            send_to_ws("invalid afsk data: too many path.", 33, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         if (index + 7 > afsk_data.len)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: broken path.");
+                            send_to_ws("invalid afsk data: broken path.", 31, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         aprs_address[13 + path_len * 7 + 1] = afsk_data.data[index++] << 1;
@@ -258,6 +289,8 @@ void afsk_send_task(void *arg)
                         if (afsk_data.data[index] >= 16)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: invalid path ssid.");
+                            send_to_ws("invalid afsk data: invalid path ssid.", 37, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         aprs_address[13 + path_len * 7 + 7] = (afsk_data.data[index++] << 1) | 0b01100000;
@@ -267,16 +300,22 @@ void afsk_send_task(void *arg)
                         if (!set_fromcall)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: no fromcall.");
+                            send_to_ws("invalid afsk data: no fromcall.", 31, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         if (!set_tocall)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: no tocall.");
+                            send_to_ws("invalid afsk data: no tocall.", 29, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         if (index > afsk_data.len)
                         {
                             ESP_LOGE(TAG, "invalid afsk data: invalid data.");
+                            send_to_ws("invalid afsk data: invalid data.", 32, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         aprs_address[13 + path_len * 7] |= 0b00000001;
@@ -285,6 +324,8 @@ void afsk_send_task(void *arg)
                         if (aprs_raw_data == NULL)
                         {
                             ESP_LOGE(TAG, "failed to modulate afsk: heap_caps_malloc failed.");
+                            send_to_ws("failed to modulate afsk: heap_caps_malloc failed.", 49, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         memcpy(aprs_raw_data, aprs_address, 14 + path_len * 7);                                   // copy header
@@ -300,6 +341,8 @@ void afsk_send_task(void *arg)
                         {
                             free(aprs_raw_data);
                             ESP_LOGE(TAG, "failed to modulate afsk: heap_caps_malloc failed.");
+                            send_to_ws("failed to modulate afsk: heap_caps_malloc failed.", 49, CTRL_CODE_S_MESSAGE);
+                            send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                             goto clean;
                         }
                         l = bit_stuff(aprs_raw_data, aprs_raw_data_size * 8, aprs_bits + 64);
@@ -314,15 +357,20 @@ void afsk_send_task(void *arg)
                         free(aprs_raw_data);
                         free(aprs_bits);
 
+                        send_to_ws(NULL, 0, CTRL_CODE_S_S_AFSK);
                         goto clean;
                     default:
                         ESP_LOGE(TAG, "invalid afsk data: invalid field.");
+                        send_to_ws("invalid afsk data: invalid field.", 33, CTRL_CODE_S_MESSAGE);
+                        send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                         goto clean;
                     }
                 }
                 goto clean;
             default:
                 ESP_LOGE(TAG, "invalid afsk data type.");
+                send_to_ws("invalid afsk data type.", 23, CTRL_CODE_S_MESSAGE);
+                send_to_ws(NULL, 0, CTRL_CODE_S_E_AFSK);
                 goto clean;
             }
 
