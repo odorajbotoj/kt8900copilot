@@ -14,7 +14,11 @@ void send_to_queue(QueueHandle_t handle, const void *data, size_t len)
     }
     memcpy(pkt.data, data, len);
     pkt.len = len;
-    xQueueSend(handle, &pkt, 0);
+    if (xQueueSend(handle, &pkt, 2) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "queue full, dropping packet (len=%zu)", len);
+        free(pkt.data);
+    }
 }
 
 void send_to_ws(const void *data, size_t len, uint8_t code)
@@ -51,5 +55,9 @@ void send_to_ws(const void *data, size_t len, uint8_t code)
         pkt.len = len + 3;
     }
     pkt.code = code;
-    xQueueSend(ws_send_queue_handle, &pkt, 0);
+    if (xQueueSend(ws_send_queue_handle, &pkt, 2) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "queue full, dropping packet (len=%zu)", len);
+        free(pkt.data);
+    }
 }
