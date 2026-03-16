@@ -5,11 +5,11 @@
 #include "led.h"
 #include "gpio.h"
 #include "sdcard.h"
-#include "camera.h"
 #include "wifi.h"
 #include "ntp.h"
 #include "audio_adc.h"
 #include "audio_pwm.h"
+#include "afsk1200.h"
 #include "ws.h"
 
 #define TAG "MAIN"
@@ -17,6 +17,7 @@
 void app_main(void)
 {
     esp_err_t ret = ESP_OK;
+    afsk_init();
 
     // welcome
     get_mac();
@@ -34,10 +35,6 @@ void app_main(void)
     // read config
     ESP_GOTO_ON_ERROR(load_config(), err, TAG, "load_config failed.");
     print_config();
-
-    // camera
-    if (app_config.enable_cam)
-        ESP_GOTO_ON_ERROR(camera_init(), err, TAG, "camera_init failed.");
 
     // wifi
     ESP_GOTO_ON_ERROR(nvs_init(), err, TAG, "nvs_init failed.");
@@ -61,10 +58,10 @@ void app_main(void)
     pwm_write_queue_handle = xQueueCreate(16, sizeof(data_packet_t));
     ESP_GOTO_ON_FALSE(pwm_write_queue_handle, ESP_FAIL, err, TAG, "failed to create pwm_write_queue_handle.");
 
-    xTaskCreatePinnedToCoreWithCaps(ws_send_task, "ws_send_task", 1024 * 1024, NULL, 1, &ws_send_task_handle, 1, MALLOC_CAP_SPIRAM);
+    xTaskCreatePinnedToCoreWithCaps(ws_send_task, "ws_send_task", 1024 * 1024, NULL, 2, &ws_send_task_handle, 1, MALLOC_CAP_SPIRAM);
     xTaskCreatePinnedToCoreWithCaps(rig_tx_watchdog, "rig_tx_watchdog", 2 * 1024, NULL, 3, &ws_send_task_handle, 1, MALLOC_CAP_SPIRAM);
-    xTaskCreatePinnedToCoreWithCaps(adc_read_task, "adc_read_task", 512 * 1024, NULL, 2, &adc_read_task_handle, 1, MALLOC_CAP_SPIRAM);
-    xTaskCreatePinnedToCoreWithCaps(pwm_write_task, "pwm_write_task", 512 * 1024, NULL, 2, &pwm_write_task_handle, 1, MALLOC_CAP_SPIRAM);
+    xTaskCreatePinnedToCoreWithCaps(adc_read_task, "adc_read_task", 128 * 1024, NULL, 2, &adc_read_task_handle, 1, MALLOC_CAP_SPIRAM);
+    xTaskCreatePinnedToCoreWithCaps(pwm_write_task, "pwm_write_task", 128 * 1024, NULL, 2, &pwm_write_task_handle, 1, MALLOC_CAP_SPIRAM);
 
     while (!esp_websocket_client_is_connected(ws_client))
     {

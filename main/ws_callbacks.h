@@ -15,7 +15,8 @@ typedef enum
     WS_STAT_IDLE,
     WS_STAT_RX,
     WS_STAT_TX,
-    WS_STAT_IMG,
+    WS_STAT_AFSK,
+    WS_STAT_PLAY,
     WS_STAT_CFG,
 } ws_state_t;
 extern volatile uint8_t ws_state;
@@ -24,7 +25,6 @@ extern volatile uint8_t ws_state;
 
 extern EventGroupHandle_t ws_event_group;
 #define WS_EVT_REFUSE_BIT BIT0
-#define WS_EVT_CALL_IMG_BIT BIT1
 
 extern TickType_t last_ptt_on;
 
@@ -38,7 +38,6 @@ void ptt_off(void);
 
 esp_err_t edit_conf(const char *d, size_t len);
 
-void get_and_upload_img_task(void *arg);
 void play_pcm_task(void *arg);
 void afsk_send_task(void *arg);
 

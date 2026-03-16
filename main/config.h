@@ -19,7 +19,6 @@ typedef struct
     char ntp_server[128];
     int adc_offset;
     int tx_limit_ms;
-    bool enable_cam;
 } app_config_t;
 
 /*
@@ -33,7 +32,6 @@ timezone CST-8
 ntp_server ntp.aliyun.com
 adc_offset -2300
 tx_limit_ms 60000
-enable_cam 0;
 */
 
 extern app_config_t app_config;

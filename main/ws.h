@@ -3,7 +3,6 @@
 #include "esp_check.h"
 
 #include "esp_websocket_client.h"
-#include "esp_camera.h"
 #include "esp_crt_bundle.h"
 
 #include "config.h"
@@ -19,7 +18,6 @@ extern QueueHandle_t ws_send_queue_handle;
 extern TaskHandle_t ws_send_task_handle;
 extern TaskHandle_t adc_read_task_handle;
 extern TaskHandle_t pwm_write_task_handle;
-extern TaskHandle_t get_and_upload_img_task_handle;
 extern TaskHandle_t play_pcm_task_handle;
 extern TaskHandle_t afsk_send_task_handle;
 

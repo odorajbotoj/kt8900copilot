@@ -29,63 +29,6 @@ inline void ptt_off(void)
     led_indicator_stop(led_handle, BLINK_RED);
     gpio_set_level(GPIO_PTT, RIG_PTT_OFF);
 }
-void get_and_upload_img_task(void *arg)
-{
-    EventBits_t bits;
-    esp_err_t ret;
-    camera_fb_t *fb = NULL;
-    ESP_LOGI(TAG, "get_and_upload_img_task runs into mainloop.");
-    for (;;)
-    {
-        bits = xEventGroupWaitBits(ws_event_group, WS_EVT_CALL_IMG_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
-        if (bits & WS_EVT_CALL_IMG_BIT)
-        {
-            ret = ESP_OK;
-            if (!app_config.enable_cam)
-            {
-                send_to_ws(NULL, 0, CTRL_CODE_S_E_CAM_DISABLED);
-                ESP_LOGE(TAG, "camera is not enabled.");
-                ret = ESP_FAIL;
-                goto err;
-            }
-            SET_STATE(WS_STAT_IMG, 1);
-            led_indicator_start(led_handle, BLINK_WHITE);
-            // refresh buffer
-            esp_camera_fb_return(esp_camera_fb_get());
-            // acquire a frame
-            fb = esp_camera_fb_get();
-            if (fb == NULL)
-            {
-                send_to_ws(NULL, 0, CTRL_CODE_S_E_IMG_NIL);
-                ESP_GOTO_ON_FALSE(fb, ESP_FAIL, err, TAG, "Camera Capture Failed");
-                goto err;
-            }
-            // begin
-            send_to_ws(NULL, 0, CTRL_CODE_IMG_UPLOAD);
-            // sending
-            for (size_t i = 0; i < fb->len; i += WS_BUF_SIZE - 1)
-            {
-                size_t valid_len = fb->len - i >= WS_BUF_SIZE - 1 ? WS_BUF_SIZE - 1 : fb->len - i;
-                send_to_ws((fb->buf) + i, valid_len, CTRL_CODE_IMG);
-                vTaskDelay(pdMS_TO_TICKS(100));
-            }
-            // end
-            send_to_ws(NULL, 0, CTRL_CODE_IMG_UPLOAD_STOP);
-            // free
-            esp_camera_fb_return(fb);
-            led_indicator_stop(led_handle, BLINK_WHITE);
-            SET_STATE(WS_STAT_IMG, 0);
-            ESP_LOGI(TAG, "IMG UPLOADED");
-            continue;
-        err:
-            if (fb)
-                esp_camera_fb_return(fb);
-            led_indicator_stop(led_handle, BLINK_WHITE);
-            SET_STATE(WS_STAT_IMG, 0);
-            ESP_LOGE(TAG, "failed to upload image. error: %s", esp_err_to_name(ret));
-        }
-    }
-}
 inline esp_err_t edit_conf(const char *d, size_t len)
 {
     SET_STATE(WS_STAT_CFG, 1);
@@ -117,6 +60,7 @@ void play_pcm_task(void *arg)
     {
         if (xQueueReceive(ws_task_play_queue_handle, &pkt, portMAX_DELAY))
         {
+            SET_STATE(WS_STAT_PLAY, 1);
             ret = ESP_OK;
             char *filenames = heap_caps_malloc(pkt.len + 1, MALLOC_CAP_SPIRAM);
             ESP_GOTO_ON_FALSE(filenames, ESP_FAIL, err, TAG, "cannot process PLAY packet: heap_caps_malloc failed.");
@@ -161,6 +105,7 @@ void play_pcm_task(void *arg)
             free(filenames);
             send_to_ws(NULL, 0, CTRL_CODE_S_E_PLAY);
             ESP_LOGI(TAG, "failed to play sounds: %s", esp_err_to_name(ret));
+            SET_STATE(WS_STAT_PLAY, 0);
         }
     }
 }
@@ -180,6 +125,7 @@ void afsk_send_task(void *arg)
     {
         if (xQueueReceive(ws_task_afsk_queue_handle, &afsk_data, portMAX_DELAY))
         {
+            SET_STATE(WS_STAT_AFSK, 1);
             switch (*(afsk_data.data))
             {
             case AFSK_DATA_BIN:
@@ -331,6 +277,13 @@ void afsk_send_task(void *arg)
                         l = add_frame_flag(aprs_bits, l);
                         nrzi_modulate(aprs_bits, l);
 
+                        for (int i = 0; i < l; ++i)
+                        {
+                            printf("%d", (aprs_bits[i / 8] >> (i % 8)) & 1);
+                            if ((i + 1) % 8 == 0)
+                                printf("\n");
+                        }
+
                         ptt_on();
                         vTaskDelay(pdMS_TO_TICKS(500));
                         afsk1200_to_pwm(aprs_bits, l);
@@ -357,6 +310,7 @@ void afsk_send_task(void *arg)
             free(afsk_data.data);
             // log
             ESP_LOGI(TAG, "AFSK1200 SEND DONE");
+            SET_STATE(WS_STAT_AFSK, 0);
         }
     }
 }
@@ -373,12 +327,6 @@ void ws_conn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_
 void ws_disconn_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
     verified_client = false;
-    if (get_and_upload_img_task_handle && eTaskGetState(get_and_upload_img_task_handle) < eDeleted)
-        vTaskDelete(get_and_upload_img_task_handle);
-    if (play_pcm_task_handle && eTaskGetState(play_pcm_task_handle) < eDeleted)
-        vTaskDelete(play_pcm_task_handle);
-    if (afsk_send_task_handle && eTaskGetState(afsk_send_task_handle) < eDeleted)
-        vTaskDelete(afsk_send_task_handle);
     if (ws_state > (1 << WS_STAT_RX))
         ptt_off();
     led_indicator_start(led_handle, BLINK_DISCONN);

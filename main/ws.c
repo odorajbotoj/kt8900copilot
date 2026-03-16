@@ -6,7 +6,6 @@ esp_websocket_client_handle_t ws_client;
 
 TaskHandle_t ws_send_task_handle;
 TaskHandle_t rig_tx_watchdog_handle;
-TaskHandle_t get_and_upload_img_task_handle;
 TaskHandle_t play_pcm_task_handle;
 TaskHandle_t afsk_send_task_handle;
 
@@ -16,34 +15,48 @@ static uint8_t payload_buf[8192] = {0};
 static uint16_t payload_len = 0;
 static uint16_t payload_pos = 0;
 
-static void handle_data(void)
+static void handle_data(uint8_t stat)
 {
-    switch (*(header_buf))
+    switch (stat)
     {
     case CTRL_CODE_PCM:
         if (GET_STATE(WS_STAT_TX))
-        {
             send_to_queue(pwm_write_queue_handle, payload_buf, payload_len);
-        }
+        else
+            ESP_LOGW(TAG, "ignore PCM");
         return;
     case CTRL_CODE_TX:
-        ptt_on();
+        if (!GET_STATE(WS_STAT_TX))
+            ptt_on();
+        else
+            ESP_LOGW(TAG, "ignore TX");
         return;
     case CTRL_CODE_TX_STOP:
-        ptt_off();
+        if (GET_STATE(WS_STAT_TX))
+            ptt_off();
+        else
+            ESP_LOGW(TAG, "ignore TX_STOP");
         return;
     case CTRL_CODE_PLAY:
-        send_to_queue(ws_task_play_queue_handle, payload_buf, payload_len);
+        if (!GET_STATE(WS_STAT_PLAY))
+            send_to_queue(ws_task_play_queue_handle, payload_buf, payload_len);
+        else
+            ESP_LOGW(TAG, "ignore PLAY");
         return;
     case CTRL_CODE_AFSK:
-        ESP_RETURN_VOID_ON_FALSE(payload_len > 1, TAG, "invalid AFSK packet.");
-        send_to_queue(ws_task_afsk_queue_handle, payload_buf, payload_len);
-        return;
-    case CTRL_CODE_IMG_GET:
-        xEventGroupSetBits(ws_event_group, WS_EVT_CALL_IMG_BIT);
+        if (!GET_STATE(WS_STAT_AFSK))
+        {
+            ESP_RETURN_VOID_ON_FALSE(payload_len > 1, TAG, "invalid AFSK packet.");
+            send_to_queue(ws_task_afsk_queue_handle, payload_buf, payload_len);
+        }
+        else
+            ESP_LOGW(TAG, "ignore AFSK");
         return;
     case CTRL_CODE_SET_CONF:
-        ESP_RETURN_VOID_ON_ERROR(edit_conf((const char *)payload_buf, payload_len), TAG, "edit_conf failed.");
+        if (!GET_STATE(WS_STAT_CFG))
+            ESP_RETURN_VOID_ON_ERROR(edit_conf((const char *)payload_buf, payload_len), TAG, "edit_conf failed.");
+        else
+            ESP_LOGW(TAG, "ignore SET_CONF");
         return;
     case CTRL_CODE_RESET:
         ESP_LOGW(TAG, "get restart.");
@@ -76,7 +89,8 @@ static void handle_data(void)
 static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, void *ev_data)
 {
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)ev_data;
-    if (!(ws_state > (1 << WS_STAT_TX)) && data->op_code == 0x02 && data->data_ptr)
+    // vTaskDelay(0);
+    if ((data->op_code == 0x02 || data->op_code == 0x00) && data->data_ptr)
     {
         for (size_t i = 0; i < data->data_len; ++i)
         {
@@ -87,19 +101,26 @@ static void ws_data_cb(void *ev_arg, esp_event_base_t ev_base, int32_t ev_id, vo
                 {
                     payload_len = header_buf[1] | (header_buf[2] << 8);
                     payload_pos = 0;
+                    if (payload_len > sizeof(payload_buf))
+                    {
+                        ESP_LOGW(TAG, "payload too large, discarding: %u > %zu", payload_len, sizeof(payload_buf));
+                        header_pos = 0;
+                        continue;
+                    }
                     if (payload_len == 0)
                     {
+                        handle_data(header_buf[0]);
                         header_pos = 0;
-                        handle_data();
                     }
                 }
                 continue;
             }
-            payload_buf[payload_pos++] = data->data_ptr[i];
-            if (payload_pos >= payload_len)
+            if (payload_pos < sizeof(payload_buf))
+                payload_buf[payload_pos++] = data->data_ptr[i];
+            if (payload_pos == payload_len)
             {
-                header_pos = 0;
-                handle_data();
+                handle_data(header_buf[0]);
+                payload_len = payload_pos = header_pos = 0;
             }
         }
     }
@@ -120,8 +141,6 @@ void ws_destroy_task(void *arg)
                 ptt_off();
             if (adc_read_task_handle && eTaskGetState(adc_read_task_handle) < eDeleted)
                 vTaskDelete(adc_read_task_handle);
-            if (get_and_upload_img_task_handle && eTaskGetState(get_and_upload_img_task_handle) < eDeleted)
-                vTaskDelete(get_and_upload_img_task_handle);
             if (play_pcm_task_handle && eTaskGetState(play_pcm_task_handle) < eDeleted)
                 vTaskDelete(play_pcm_task_handle);
             if (afsk_send_task_handle && eTaskGetState(afsk_send_task_handle) < eDeleted)
@@ -164,16 +183,8 @@ esp_err_t websocket_init()
                         TAG,
                         "Failed to register WebSocket disconn event callback.");
     ws_event_group = xEventGroupCreate();
-    xTaskCreatePinnedToCoreWithCaps(ws_destroy_task, "ws_destroy_task", 2 * 1024, NULL, 5, NULL, 1, MALLOC_CAP_SPIRAM);
+    xTaskCreatePinnedToCoreWithCaps(ws_destroy_task, "ws_destroy_task", 2 * 1024, NULL, 4, NULL, 1, MALLOC_CAP_SPIRAM);
 
-    xTaskCreatePinnedToCoreWithCaps(get_and_upload_img_task,
-                                    "get_and_upload_img_task",
-                                    512 * 1024,
-                                    NULL,
-                                    2,
-                                    &get_and_upload_img_task_handle,
-                                    1,
-                                    MALLOC_CAP_SPIRAM);
     ws_task_play_queue_handle = xQueueCreate(16, sizeof(data_packet_t));
     ESP_RETURN_ON_FALSE(ws_task_play_queue_handle, ESP_FAIL, TAG, "failed to create ws_task_play_queue_handle.");
     ws_task_afsk_queue_handle = xQueueCreate(16, sizeof(data_packet_t));
@@ -243,9 +254,10 @@ void ws_send_task(void *arg)
                 else
                 {
                     esp_websocket_client_send_bin(ws_client, (const char *)pkt.data, pkt.len, portMAX_DELAY);
-                    free(pkt.data);
                 }
             }
+            if (pkt.data)
+                free(pkt.data);
         }
     }
 }

@@ -4,8 +4,21 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <math.h>
 
 #include "ws.h"
+
+// parameters
+#define SAMPLE_RATE 16000
+#define BAUD_RATE 1200
+#define MARK_FREQ 1200
+#define SPACE_FREQ 2200
+#define TABLE_SIZE 256
+#define AMPLITUDE 32767
+
+// sin table
+extern int16_t sin_table[TABLE_SIZE];
+void afsk_init(void);
 
 typedef struct
 {
