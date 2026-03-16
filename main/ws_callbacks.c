@@ -2,8 +2,6 @@
 
 #define TAG "WS_CB"
 
-volatile uint8_t ws_state = 0;
-
 EventGroupHandle_t ws_event_group;
 TickType_t last_ptt_on; // used for calculating tx time limit
 
@@ -13,39 +11,69 @@ QueueHandle_t ws_task_afsk_queue_handle;
 
 volatile bool verified_client;
 
+// functions below are for ws_state
+static portMUX_TYPE ws_state_mux = portMUX_INITIALIZER_UNLOCKED;
+static uint8_t ws_state = 0;
+inline void ws_state_set(ws_state_t state, bool v)
+{
+    portENTER_CRITICAL(&ws_state_mux);
+    if (v)
+        ws_state |= state;
+    else
+        ws_state &= ~state;
+    portEXIT_CRITICAL(&ws_state_mux);
+}
+inline bool ws_state_check(uint8_t v)
+{
+    bool ret;
+    portENTER_CRITICAL(&ws_state_mux);
+    ret = ((ws_state & v) == 0);
+    portEXIT_CRITICAL(&ws_state_mux);
+    return ret;
+}
+inline bool ws_state_idle(void)
+{
+    bool ret;
+    portENTER_CRITICAL(&ws_state_mux);
+    ret = (ws_state == 0);
+    portEXIT_CRITICAL(&ws_state_mux);
+    return ret;
+}
+// functions above are for ws_state
+
 // functions below are for data processing callback
 inline void ptt_on(void)
 {
     last_pwm_write = last_ptt_on = xTaskGetTickCount();
-    SET_STATE(WS_STAT_TX, 1);
+    ws_state_set(WS_STAT_RX, true);
     ESP_LOGI(TAG, "RIG TX ON");
     led_indicator_start(led_handle, BLINK_RED);
     gpio_set_level(GPIO_PTT, RIG_PTT_ON);
 }
 inline void ptt_off(void)
 {
-    SET_STATE(WS_STAT_TX, 0);
+    ws_state_set(WS_STAT_RX, false);
     ESP_LOGI(TAG, "RIG TX OFF");
     led_indicator_stop(led_handle, BLINK_RED);
     gpio_set_level(GPIO_PTT, RIG_PTT_OFF);
 }
 inline esp_err_t edit_conf(const char *d, size_t len)
 {
-    SET_STATE(WS_STAT_CFG, 1);
+    ws_state_set(WS_STAT_CFG, true);
     parse_conf_line(d, len);
     esp_err_t e = write_config();
     if (e != ESP_OK)
     {
         send_to_ws(NULL, 0, CTRL_CODE_S_E_SET_CONF);
         ESP_LOGE(TAG, "failed to set config.");
-        SET_STATE(WS_STAT_CFG, 0);
+        ws_state_set(WS_STAT_CFG, false);
         return e;
     }
     send_to_ws(NULL, 0, CTRL_CODE_S_S_SET_CONF);
     ESP_LOGI(TAG, "SET CONF:");
     print_config();
     ESP_LOGI(TAG, "SET CONF DONE");
-    SET_STATE(WS_STAT_CFG, 0);
+    ws_state_set(WS_STAT_CFG, false);
     return ESP_OK;
 }
 void play_pcm_task(void *arg)
@@ -60,7 +88,7 @@ void play_pcm_task(void *arg)
     {
         if (xQueueReceive(ws_task_play_queue_handle, &pkt, portMAX_DELAY))
         {
-            SET_STATE(WS_STAT_PLAY, 1);
+            ws_state_set(WS_STAT_PLAY, true);
             ret = ESP_OK;
             char *filenames = heap_caps_malloc(pkt.len + 1, MALLOC_CAP_SPIRAM);
             ESP_GOTO_ON_FALSE(filenames, ESP_FAIL, err, TAG, "cannot process PLAY packet: heap_caps_malloc failed.");
@@ -97,6 +125,7 @@ void play_pcm_task(void *arg)
             free(filenames);
             send_to_ws(NULL, 0, CTRL_CODE_S_S_PLAY);
             ESP_LOGI(TAG, "play sounds ok.");
+            ws_state_set(WS_STAT_PLAY, false);
             continue;
 
         err:
@@ -105,7 +134,7 @@ void play_pcm_task(void *arg)
             free(filenames);
             send_to_ws(NULL, 0, CTRL_CODE_S_E_PLAY);
             ESP_LOGI(TAG, "failed to play sounds: %s", esp_err_to_name(ret));
-            SET_STATE(WS_STAT_PLAY, 0);
+            ws_state_set(WS_STAT_PLAY, false);
         }
     }
 }
@@ -125,7 +154,7 @@ void afsk_send_task(void *arg)
     {
         if (xQueueReceive(ws_task_afsk_queue_handle, &afsk_data, portMAX_DELAY))
         {
-            SET_STATE(WS_STAT_AFSK, 1);
+            ws_state_set(WS_STAT_AFSK, true);
             switch (*(afsk_data.data))
             {
             case AFSK_DATA_BIN:
@@ -310,7 +339,7 @@ void afsk_send_task(void *arg)
             free(afsk_data.data);
             // log
             ESP_LOGI(TAG, "AFSK1200 SEND DONE");
-            SET_STATE(WS_STAT_AFSK, 0);
+            ws_state_set(WS_STAT_AFSK, false);
         }
     }
 }

@@ -49,11 +49,12 @@ void adc_read_task(void *arg)
     ESP_LOGI(TAG, "adc_read_task runs into mainloop.");
     for (;;)
     {
-        while (ws_state != WS_STAT_IDLE || gpio_get_level(GPIO_CTRL) == RIG_CTRL_OFF || !esp_websocket_client_is_connected(ws_client))
+        while (gpio_get_level(GPIO_CTRL) == RIG_CTRL_OFF || !ws_state_idle() || !esp_websocket_client_is_connected(ws_client))
         {
             vTaskDelay(pdMS_TO_TICKS(20)); // waiting
         }
         send_to_ws(NULL, 0, CTRL_CODE_RX);
+        ws_state_set(WS_STAT_TX, true);
         ESP_LOGI(TAG, "RIG RX ON");
         led_indicator_start(led_handle, BLINK_GREEN);
         ctrl_level = gpio_get_level(GPIO_CTRL) == RIG_CTRL_ON;
@@ -74,7 +75,7 @@ void adc_read_task(void *arg)
                         ws_send_buf[i] = ((int16_t)(adc_read_buf[i].raw_data) + app_config.adc_offset) << 4; // process samples
                     }
                 }
-                if (ws_state != WS_STAT_IDLE || !esp_websocket_client_is_connected(ws_client))
+                if (!ws_state_check(WS_STAT_RX | WS_STAT_AFSK | WS_STAT_PLAY | WS_STAT_CFG) || !esp_websocket_client_is_connected(ws_client))
                 {
                     vTaskDelay(pdMS_TO_TICKS(100));
                     break;
@@ -86,6 +87,7 @@ void adc_read_task(void *arg)
         }
         led_indicator_stop(led_handle, BLINK_GREEN);
         ESP_LOGI(TAG, "RIG RX OFF");
+        ws_state_set(WS_STAT_TX, false);
         send_to_ws(NULL, 0, CTRL_CODE_RX_STOP);
         vTaskDelay(pdMS_TO_TICKS(100));
     }

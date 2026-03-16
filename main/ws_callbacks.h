@@ -4,6 +4,7 @@
 
 #include "esp_websocket_client.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #include "led.h"
 #include "gpio.h"
@@ -12,16 +13,15 @@
 
 typedef enum
 {
-    WS_STAT_IDLE,
-    WS_STAT_RX,
-    WS_STAT_TX,
-    WS_STAT_AFSK,
-    WS_STAT_PLAY,
-    WS_STAT_CFG,
+    WS_STAT_TX = 1,
+    WS_STAT_RX = 1 << 1,
+    WS_STAT_AFSK = 1 << 2,
+    WS_STAT_PLAY = 1 << 3,
+    WS_STAT_CFG = 1 << 4,
 } ws_state_t;
-extern volatile uint8_t ws_state;
-#define SET_STATE(s, v) (ws_state = (ws_state & ~(1 << (s))) | ((v) << (s)))
-#define GET_STATE(s) ((ws_state >> (s)) & 1)
+void ws_state_set(ws_state_t state, bool v);
+bool ws_state_check(uint8_t v);
+bool ws_state_idle(void);
 
 extern EventGroupHandle_t ws_event_group;
 #define WS_EVT_REFUSE_BIT BIT0

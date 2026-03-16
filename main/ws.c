@@ -20,31 +20,25 @@ static void handle_data(uint8_t stat)
     switch (stat)
     {
     case CTRL_CODE_PCM:
-        if (GET_STATE(WS_STAT_TX))
+        if (!ws_state_check(WS_STAT_RX) && ws_state_check(WS_STAT_AFSK | WS_STAT_PLAY))
             send_to_queue(pwm_write_queue_handle, payload_buf, payload_len);
         else
             ESP_LOGW(TAG, "ignore PCM");
         return;
     case CTRL_CODE_TX:
-        if (!GET_STATE(WS_STAT_TX))
+        if (ws_state_check(WS_STAT_RX | WS_STAT_AFSK | WS_STAT_PLAY))
             ptt_on();
         else
             ESP_LOGW(TAG, "ignore TX");
         return;
     case CTRL_CODE_TX_STOP:
-        if (GET_STATE(WS_STAT_TX))
+        if (!ws_state_check(WS_STAT_RX) && ws_state_check(WS_STAT_AFSK | WS_STAT_PLAY))
             ptt_off();
         else
             ESP_LOGW(TAG, "ignore TX_STOP");
         return;
-    case CTRL_CODE_PLAY:
-        if (!GET_STATE(WS_STAT_PLAY))
-            send_to_queue(ws_task_play_queue_handle, payload_buf, payload_len);
-        else
-            ESP_LOGW(TAG, "ignore PLAY");
-        return;
     case CTRL_CODE_AFSK:
-        if (!GET_STATE(WS_STAT_AFSK))
+        if (ws_state_check(WS_STAT_RX | WS_STAT_AFSK | WS_STAT_PLAY))
         {
             ESP_RETURN_VOID_ON_FALSE(payload_len > 1, TAG, "invalid AFSK packet.");
             send_to_queue(ws_task_afsk_queue_handle, payload_buf, payload_len);
@@ -52,11 +46,14 @@ static void handle_data(uint8_t stat)
         else
             ESP_LOGW(TAG, "ignore AFSK");
         return;
-    case CTRL_CODE_SET_CONF:
-        if (!GET_STATE(WS_STAT_CFG))
-            ESP_RETURN_VOID_ON_ERROR(edit_conf((const char *)payload_buf, payload_len), TAG, "edit_conf failed.");
+    case CTRL_CODE_PLAY:
+        if (ws_state_check(WS_STAT_RX | WS_STAT_AFSK | WS_STAT_PLAY))
+            send_to_queue(ws_task_play_queue_handle, payload_buf, payload_len);
         else
-            ESP_LOGW(TAG, "ignore SET_CONF");
+            ESP_LOGW(TAG, "ignore PLAY");
+        return;
+    case CTRL_CODE_SET_CONF:
+        ESP_RETURN_VOID_ON_ERROR(edit_conf((const char *)payload_buf, payload_len), TAG, "edit_conf failed.");
         return;
     case CTRL_CODE_RESET:
         ESP_LOGW(TAG, "get restart.");
@@ -137,7 +134,7 @@ void ws_destroy_task(void *arg)
             esp_websocket_client_stop(ws_client);
             esp_websocket_client_destroy(ws_client);
             ESP_LOGW(TAG, "connection refused, websocket client closed.");
-            if (ws_state > (1 << WS_STAT_RX))
+            if (!ws_state_check(WS_STAT_RX))
                 ptt_off();
             if (adc_read_task_handle && eTaskGetState(adc_read_task_handle) < eDeleted)
                 vTaskDelete(adc_read_task_handle);
@@ -217,7 +214,7 @@ void rig_tx_watchdog(void *arg)
     for (;;)
     {
         vTaskDelay(pdMS_TO_TICKS(100));
-        if (GET_STATE(WS_STAT_TX))
+        if (!ws_state_check(WS_STAT_RX))
         {
             if (app_config.tx_limit_ms > 0 && xTaskGetTickCount() - last_ptt_on > pdMS_TO_TICKS(app_config.tx_limit_ms))
             {
