@@ -70,14 +70,14 @@ size_t bit_stuff(const uint8_t *source, size_t bit_len, uint8_t *dest)
 size_t add_frame_flag(uint8_t *source, size_t bit_len)
 {
     memset(source, 0x7E, 64);
-    SET_BIT(source, bit_len + 8, 0);
-    SET_BIT(source, bit_len + 9, 1);
-    SET_BIT(source, bit_len + 10, 1);
-    SET_BIT(source, bit_len + 11, 1);
-    SET_BIT(source, bit_len + 12, 1);
-    SET_BIT(source, bit_len + 13, 1);
-    SET_BIT(source, bit_len + 14, 1);
-    SET_BIT(source, bit_len + 15, 0);
+    SET_BIT(source, bit_len + 512, 0);
+    SET_BIT(source, bit_len + 513, 1);
+    SET_BIT(source, bit_len + 514, 1);
+    SET_BIT(source, bit_len + 515, 1);
+    SET_BIT(source, bit_len + 516, 1);
+    SET_BIT(source, bit_len + 517, 1);
+    SET_BIT(source, bit_len + 518, 1);
+    SET_BIT(source, bit_len + 519, 0);
     return bit_len + 520;
 }
 
