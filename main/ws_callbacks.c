@@ -305,14 +305,6 @@ void afsk_send_task(void *arg)
                         l = bit_stuff(aprs_raw_data, aprs_raw_data_size * 8, aprs_bits + 64);
                         l = add_frame_flag(aprs_bits, l);
                         nrzi_modulate(aprs_bits, l);
-
-                        for (int i = 0; i < l; ++i)
-                        {
-                            printf("%d", (aprs_bits[i / 8] >> (i % 8)) & 1);
-                            if ((i + 1) % 8 == 0)
-                                printf("\n");
-                        }
-
                         ptt_on();
                         vTaskDelay(pdMS_TO_TICKS(500));
                         afsk1200_to_pwm(aprs_bits, l);
