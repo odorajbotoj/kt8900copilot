@@ -43,6 +43,7 @@ void adc_read_task(void *arg)
     adc_continuous_data_t adc_read_buf[ADC_BUF_SIZE] = {0}; // 样本缓冲区
     int16_t ws_send_buf[ADC_BUF_SIZE] = {0};                // 待发数据缓冲区
     uint32_t read_samples = 0;                              // 读取到的样本数
+    uint32_t write_index;
     esp_err_t err;
     bool ctrl_level;
     uint8_t ctrl_off_delay = 0;
@@ -64,15 +65,16 @@ void adc_read_task(void *arg)
             {
                 ctrl_off_delay = 16;
             }
-            err = adc_continuous_read_parse(adc_handle, adc_read_buf, sizeof(adc_read_buf) / sizeof(adc_read_buf[0]), &read_samples, pdMS_TO_TICKS(100)); // read and parse
+            err = adc_continuous_read_parse(adc_handle, adc_read_buf, sizeof(adc_read_buf) / sizeof(adc_read_buf[0]), &read_samples, pdMS_TO_TICKS(70)); // read and parse
             read_samples = ADC_BUF_SIZE < read_samples ? ADC_BUF_SIZE : read_samples;
             if (ESP_OK == err)
             {
+                write_index = 0;
                 for (uint32_t i = 0; i < read_samples; ++i)
                 {
                     if (adc_read_buf[i].valid)
                     {
-                        ws_send_buf[i] = ((int16_t)(adc_read_buf[i].raw_data) + app_config.adc_offset) << 4; // process samples
+                        ws_send_buf[write_index++] = ((int16_t)(adc_read_buf[i].raw_data) + app_config.adc_offset) << 4; // process samples
                     }
                 }
                 if (!ws_state_check(WS_STAT_RX | WS_STAT_AFSK | WS_STAT_PLAY | WS_STAT_CFG) || !esp_websocket_client_is_connected(ws_client))
@@ -80,7 +82,7 @@ void adc_read_task(void *arg)
                     vTaskDelay(pdMS_TO_TICKS(100));
                     break;
                 }
-                send_to_ws(ws_send_buf, read_samples * 2, CTRL_CODE_PCM);
+                send_to_ws(ws_send_buf, write_index * 2, CTRL_CODE_PCM);
             }
             --ctrl_off_delay;
             ctrl_level = gpio_get_level(GPIO_CTRL) == RIG_CTRL_ON;

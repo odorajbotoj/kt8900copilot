@@ -17,6 +17,11 @@
 void app_main(void)
 {
     esp_err_t ret = ESP_OK;
+
+    // gpio
+    ESP_GOTO_ON_ERROR(gpio_init(), err, TAG, "gpio_init failed.");
+
+    // afsk
     afsk_init();
 
     // welcome
@@ -26,9 +31,6 @@ void app_main(void)
     ESP_ERROR_CHECK(led_init());
     led_indicator_start(led_handle, BLINK_OFF);
     led_indicator_start(led_handle, BLINK_YELLOW_3);
-
-    // gpio
-    ESP_GOTO_ON_ERROR(gpio_init(), err, TAG, "gpio_init failed.");
 
     // sdcard
     ESP_GOTO_ON_ERROR(sdcard_init(), err, TAG, "sdcard_init failed.");
