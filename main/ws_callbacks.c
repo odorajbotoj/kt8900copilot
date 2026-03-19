@@ -83,6 +83,7 @@ void play_pcm_task(void *arg)
     char *name;
     char full_filename[128];
     char err_info[160];
+    char read_buf[1024];
     ESP_LOGI(TAG, "play_pcm_task runs into mainloop.");
     for (;;)
     {
@@ -100,7 +101,10 @@ void play_pcm_task(void *arg)
             memcpy(filenames, pkt.data, pkt.len);
             name = strtok_r(filenames, "/", &saveptr);
             ptt_on();
-            vTaskDelay(pdMS_TO_TICKS(400));
+            memset(read_buf, 0, 1024);
+            vTaskDelay(pdMS_TO_TICKS(300));
+            send_to_queue(pwm_write_queue_handle, read_buf, 1024);
+            vTaskDelay(pdMS_TO_TICKS(30));
             while (name != NULL)
             {
                 sprintf(full_filename, MOUNT_POINT "/pcm/%s.pcm", name);
@@ -113,7 +117,6 @@ void play_pcm_task(void *arg)
                     send_to_ws(err_info, strlen(err_info), CTRL_CODE_S_MESSAGE);
                     goto err;
                 }
-                char read_buf[1024];
                 size_t read_bytes = 0;
                 uint8_t time_compensation_count = 0;
                 while ((read_bytes = fread(read_buf, 1, sizeof(read_buf), f)))
@@ -130,8 +133,8 @@ void play_pcm_task(void *arg)
                 fclose(f);
                 name = strtok_r(NULL, "/", &saveptr);
             }
-            vTaskDelay(pdMS_TO_TICKS(100));
-            ptt_off();
+            // vTaskDelay(pdMS_TO_TICKS(100));
+            // ptt_off();
             free(pkt.data);
             free(filenames);
             send_to_ws(NULL, 0, CTRL_CODE_S_S_PLAY);
@@ -188,8 +191,8 @@ void afsk_send_task(void *arg)
                 ptt_on();
                 vTaskDelay(pdMS_TO_TICKS(500));
                 afsk1200_to_pwm(afsk_data.data + 3, bit_len);
-                vTaskDelay(pdMS_TO_TICKS(300));
-                ptt_off();
+                // vTaskDelay(pdMS_TO_TICKS(300));
+                // ptt_off();
                 send_to_ws(NULL, 0, CTRL_CODE_S_S_AFSK);
                 goto clean;
             case AFSK_DATA_APRS:
@@ -351,8 +354,8 @@ void afsk_send_task(void *arg)
                         ptt_on();
                         vTaskDelay(pdMS_TO_TICKS(500));
                         afsk1200_to_pwm(aprs_bits, l);
-                        vTaskDelay(pdMS_TO_TICKS(300));
-                        ptt_off();
+                        // vTaskDelay(pdMS_TO_TICKS(300));
+                        // ptt_off();
 
                         free(aprs_raw_data);
                         free(aprs_bits);

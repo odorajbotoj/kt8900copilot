@@ -38,7 +38,7 @@ static void handle_data(uint8_t stat)
             ESP_LOGW(TAG, "ignore TX_STOP");
         return;
     case CTRL_CODE_AFSK:
-        if (ws_state_check(WS_STAT_RX | WS_STAT_AFSK | WS_STAT_PLAY))
+        if (ws_state_check(WS_STAT_AFSK | WS_STAT_PLAY))
         {
             ESP_RETURN_VOID_ON_FALSE(payload_len > 1, TAG, "invalid AFSK packet.");
             send_to_queue(ws_task_afsk_queue_handle, payload_buf, payload_len);
@@ -47,7 +47,7 @@ static void handle_data(uint8_t stat)
             ESP_LOGW(TAG, "ignore AFSK");
         return;
     case CTRL_CODE_PLAY:
-        if (ws_state_check(WS_STAT_RX | WS_STAT_AFSK | WS_STAT_PLAY))
+        if (ws_state_check(WS_STAT_AFSK | WS_STAT_PLAY))
             send_to_queue(ws_task_play_queue_handle, payload_buf, payload_len);
         else
             ESP_LOGW(TAG, "ignore PLAY");
@@ -222,10 +222,10 @@ void rig_tx_watchdog(void *arg)
                 ESP_LOGW(TAG, "rig_tx_watchdog set ptt_off: exceed time limit.");
                 continue;
             }
-            if (xTaskGetTickCount() - last_pwm_write > pdMS_TO_TICKS(750))
+            if (xTaskGetTickCount() - last_pwm_write > pdMS_TO_TICKS(550))
             {
                 ptt_off();
-                ESP_LOGW(TAG, "rig_tx_watchdog set ptt_off: slow pwm write.");
+                ESP_LOGW(TAG, "rig_tx_watchdog set ptt_off: no pwm data in 550ms.");
                 continue;
             }
         }
